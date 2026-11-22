@@ -133,6 +133,12 @@ def salud():
     return "ok"
 
 
+@app.get("/ejemplos/<path:archivo>")
+def ejemplos(archivo):
+    """Fotos sintéticas de ejemplo (escala conocida: 30 px/cm) para probar sin cámara."""
+    return send_from_directory(os.path.join(CARPETA_WEB, "ejemplos"), archivo, max_age=86400)
+
+
 @app.get("/api/productos")
 def productos():
     return jsonify([{"id": i, "nombre": p.nombre, "categoria": p.categoria, "madurez": p.rangos_maduro is not None}

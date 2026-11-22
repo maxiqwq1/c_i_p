@@ -2,197 +2,532 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Inspección de productos agrícolas · Cálculo Integral</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b100e">
+<meta name="description" content="Inspección de frutas y verduras con la cámara: área, volumen, peso, daño y madurez calculados con cálculo integral.">
+<title>Inspección agrícola · Cálculo Integral</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234fd38a'/%3E%3Cpath d='M19.5 7.2c-2.3-1-4.3.2-4.8 2.7l-2.6 12.6c-.5 2.4-2.6 3.3-4.6 2.3' fill='none' stroke='%23062012' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
   :root {
-    --fondo: #14161a; --panel: #1d2026; --borde: #2c3039; --texto: #e9ecf1; --tenue: #9aa1ad;
-    --acento: #ffd15a; --boton: #2a2f38; --boton-h: #353b46;
+    color-scheme: dark;
+    --bg: #0b100e; --bg-2: #0f1513; --card: #141c19; --card-2: #1a241f; --card-3: #202c27;
+    --line: #24312b; --line-2: #31403a;
+    --text: #e8f0eb; --muted: #9aaca2; --faint: #6f8278;
+    --green: #4fd38a; --green-hover: #6be0a0; --green-ink: #04170c;
+    --amber: #f3c55b; --red: #ef5b57; --blue: #5ba8f0; --cyan: #5bd0f0;
+    --radius: 16px; --radius-s: 11px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --math: "Cambria Math", "STIX Two Math", "Latin Modern Math", Georgia, serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--fondo); color: var(--texto);
-         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { padding: 18px 24px 10px; }
-  h1 { margin: 0; font-size: 1.35rem; }
-  header p { margin: 4px 0 0; color: var(--tenue); font-size: .92rem; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 18px; padding: 10px 24px 28px; }
-  @media (max-width: 920px) { main { grid-template-columns: 1fr; padding: 8px 12px 24px; } header { padding: 14px 12px 6px; } }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; color: var(--text); font: 15px/1.5 var(--font);
+    background: radial-gradient(1200px 500px at 0% -10%, rgba(79, 211, 138, .10), transparent 60%),
+                radial-gradient(900px 400px at 100% 0%, rgba(91, 168, 240, .06), transparent 60%), var(--bg);
+    min-height: 100vh;
+  }
+  svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+          stroke-linecap: round; stroke-linejoin: round; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
-  .barra { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
-  button, .boton { background: var(--boton); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
-           padding: 8px 13px; font: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center;
-           text-decoration: none; }
-  button:hover, .boton:hover { background: var(--boton-h); }
-  button:disabled { opacity: .45; cursor: default; }
-  button.principal { background: var(--acento); color: #1b1b1b; border-color: var(--acento); font-weight: 600; }
-  button.principal:hover { filter: brightness(1.06); }
-  button.activo { border-color: var(--acento); color: var(--acento); }
-  kbd { font: 11px ui-monospace, monospace; padding: 1px 5px; border: 1px solid var(--borde); border-radius: 4px; color: var(--tenue); }
-  button.principal kbd { color: #1b1b1b; border-color: rgba(0,0,0,.3); }
+  /* ------------------------------------------------------------------ cabecera */
+  .cab { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+         max-width: 1440px; margin: 0 auto; padding: 16px 20px 14px; }
+  .marca { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; min-width: 0; }
+  .logo { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center;
+          background: linear-gradient(140deg, #6be0a0, #2fb36b); box-shadow: 0 6px 20px rgba(79, 211, 138, .25); }
+  .marca strong { display: block; font-size: 1.08rem; letter-spacing: -.01em; }
+  .marca small { display: block; color: var(--muted); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ------------------------------------------------------------------ botones */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 9px 14px;
+         border-radius: var(--radius-s); border: 1px solid var(--line-2); background: var(--card-2); color: var(--text);
+         font: 600 .92rem var(--font); cursor: pointer; text-decoration: none; white-space: nowrap;
+         transition: background .15s, border-color .15s, color .15s, transform .06s; }
+  .btn:hover { background: var(--card-3); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .42; cursor: not-allowed; transform: none; }
+  .btn.primario { background: var(--green); border-color: var(--green); color: var(--green-ink); }
+  .btn.primario:hover { background: var(--green-hover); }
+  .btn.contorno { border-color: rgba(79, 211, 138, .55); color: var(--green); background: rgba(79, 211, 138, .07); }
+  .btn.contorno:hover { background: rgba(79, 211, 138, .14); }
+  .btn.fantasma { background: transparent; border-color: transparent; color: var(--muted); }
+  .btn.fantasma:hover { background: var(--card-2); color: var(--text); }
+  .btn.pequeno { min-height: 34px; padding: 6px 11px; font-size: .85rem; }
+  .btn.activo { border-color: rgba(79, 211, 138, .55); color: var(--green); }
+  kbd { font: 600 .68rem ui-monospace, "Cascadia Mono", Consolas, monospace; padding: 1px 6px; border-radius: 5px;
+        border: 1px solid currentColor; opacity: .55; }
   input[type=file] { display: none; }
+  .enlace { background: none; border: 0; padding: 0; color: var(--green); font: inherit; cursor: pointer; text-decoration: underline; }
 
-  .lienzo { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #0b0c0e; border: 2px solid var(--borde);
-            border-radius: 10px; overflow: hidden; transition: border-color .3s; }
-  .lienzo.destello { border-color: #3ddc84; }
-  .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* ------------------------------------------------------------------ distribución */
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 20px; align-items: start;
+         max-width: 1440px; margin: 0 auto; padding: 0 20px 32px; }
+  .lateral { min-width: 0; position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; scrollbar-width: thin;
+             display: grid; gap: 14px; padding-bottom: 2px; }
+
+  /* ------------------------------------------------------------------ escenario (cámara) */
+  .escenario { min-width: 0; }
+  .lienzo { --arn: 1.3333; position: relative; aspect-ratio: 4 / 3; width: min(100%, calc(74vh * var(--arn))); margin: 0 auto;
+            background: #050807; border: 1px solid var(--line); border-radius: 20px; overflow: hidden;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, .35); transition: box-shadow .3s, border-color .3s; }
+  .lienzo.destello { border-color: var(--green); box-shadow: 0 0 0 4px rgba(79, 211, 138, .35), 0 18px 40px rgba(0, 0, 0, .35); }
+  .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .lienzo.sin-imagen { aspect-ratio: auto; width: 100%; min-height: clamp(420px, 64vh, 680px); }
+  .lienzo.sin-imagen .vacio { min-height: inherit; }
+  .lienzo.sin-imagen canvas { display: none; }
   .oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-  .vacio { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--tenue); }
-  .ayuda { color: var(--tenue); font-size: .85rem; margin: 10px 2px 0; }
 
-  .panel { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; align-self: start; }
-  .panel h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); margin: 18px 0 8px; }
-  .panel h2:first-child { margin-top: 0; }
-  select { width: 100%; background: var(--boton); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
-           padding: 8px 10px; font: inherit; }
-  .reconocido { margin-top: 6px; font-size: .88rem; color: var(--tenue); min-height: 1.3em; }
-  .porque { font-size: .8rem; color: var(--tenue); opacity: .85; min-height: 1.2em; }
-  .ensenar { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-  .conteo { font-size: .82rem; color: var(--tenue); margin-top: 6px; }
-  .estado { margin-top: 12px; border-radius: 9px; padding: 12px 14px; font-size: 1.35rem; font-weight: 700; letter-spacing: .02em;
-            background: #2a2f38; color: #fff; transition: background .2s; }
-  .estado small { display: block; font-size: .8rem; font-weight: 400; opacity: .85; letter-spacing: 0; }
-  dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0 0; }
-  dt { color: var(--tenue); }
-  dt .f { font-family: "Cambria Math", "STIX Two Math", serif; color: var(--acento); }
-  dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .acciones .ancho { grid-column: 1 / -1; justify-content: center; }
-  .acciones button { justify-content: space-between; }
-  label.rango { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-bottom: 4px; color: var(--tenue); font-size: .9rem; }
-  label.rango input { grid-column: 1 / -1; width: 100%; accent-color: var(--acento); }
-  .nota { font-size: .85rem; color: var(--tenue); margin: 4px 0 0; }
-  .escala { font-size: .9rem; color: var(--tenue); }
-  .escala.sin { color: #ff8a5c; }
-  .enlace { background: none; border: none; color: var(--acento); padding: 0; text-decoration: underline; cursor: pointer; font-size: .85rem; }
+  .hud-sup { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between;
+             align-items: flex-start; gap: 10px; pointer-events: none; z-index: 2; }
+  .hud-sup > * { pointer-events: auto; }
+  .chip { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 8px; max-width: 70%;
+          padding: 7px 13px; border-radius: 999px; background: rgba(6, 10, 8, .72); border: 1px solid rgba(255, 255, 255, .09);
+          font-size: .82rem; font-weight: 650; }
+  .chip span:not(.punto) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .punto { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--faint); }
+  .chip[data-tipo="buscando"] .punto { animation: latido 1.3s ease-in-out infinite; }
+  .chip[data-tipo="quieto"] .punto, .chip[data-tipo="capturando"] .punto { background: var(--amber); }
+  .chip[data-tipo="listo"] .punto, .chip[data-tipo="capturado"] .punto { background: var(--green); }
+  .chip[data-tipo="capturado"] { color: var(--green); }
+  .chip[data-tipo="capturando"] .punto { animation: latido .7s ease-in-out infinite; }
+  .chip-prog { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--amber); transition: width .2s linear; }
+  @keyframes latido { 50% { opacity: .25; transform: scale(.7); } }
+  .hud-iconos { display: flex; gap: 6px; }
+  .ico { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; cursor: pointer;
+         background: rgba(6, 10, 8, .72); border: 1px solid rgba(255, 255, 255, .09); color: #c9d9cf; transition: color .15s, border-color .15s; }
+  .ico:hover { color: #fff; }
+  .ico.activo { color: var(--green); border-color: rgba(79, 211, 138, .55); }
 
-  .ultima { display: none; gap: 10px; align-items: center; background: #23272e; border: 1px solid var(--borde);
-            border-radius: 8px; padding: 8px; cursor: pointer; margin-bottom: 8px; }
-  .ultima img { width: 96px; height: 60px; object-fit: cover; border-radius: 4px; background: #fff; }
-  .ultima div { font-size: .85rem; }
+  .hud-res { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: grid; gap: 6px; pointer-events: none;
+             padding: 34px 16px 13px; background: linear-gradient(to top, rgba(4, 7, 6, .94), rgba(4, 7, 6, .7) 55%, transparent); }
+  .hud-fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .hud-prod { font-weight: 750; font-size: 1.12rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-met { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); font-size: .86rem; font-variant-numeric: tabular-nums; }
+  .hud-met b { color: var(--text); font-weight: 700; font-size: .98rem; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--card-3); color: #fff;
+          font-size: .72rem; font-weight: 800; letter-spacing: .05em; white-space: nowrap; transition: background .25s; }
+
+  /* estado vacío */
+  .vacio { position: relative; display: grid; place-items: center; padding: 34px 22px; min-height: 420px; text-align: center;
+           background: radial-gradient(500px 260px at 50% 30%, rgba(79, 211, 138, .08), transparent 70%); }
+  .vacio-in { max-width: 470px; display: grid; gap: 16px; justify-items: center; }
+  .vacio h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.01em; }
+  .vacio p { margin: -6px 0 0; color: var(--muted); }
+  .pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; text-align: left; color: var(--muted); font-size: .9rem; }
+  .pasos li { display: flex; align-items: center; gap: 11px; }
+  .pasos .n { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center;
+              background: rgba(79, 211, 138, .12); color: var(--green); font-weight: 800; font-size: .8rem; }
+  .vacio-botones { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .ejemplos { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; color: var(--faint); font-size: .84rem; }
+  .ejemplos button { border: 1px solid var(--line-2); background: var(--card); color: var(--text); border-radius: 999px;
+                     padding: 5px 12px; font: 600 .82rem var(--font); cursor: pointer; }
+  .ejemplos button:hover { border-color: var(--green); color: var(--green); }
+
+  /* controles bajo la cámara */
+  .controles { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px auto 0; width: min(100%, 980px); }
+  .controles .empuje { flex: 1; }
+  .escenario.sin-modo .controles, .escenario.sin-modo .leyenda { display: none; }
+  .interruptor { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-weight: 600; font-size: .88rem;
+                 cursor: pointer; user-select: none; padding: 0 4px; }
+  .interruptor input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--line-2);
+                       position: relative; cursor: pointer; transition: background .2s; margin: 0; flex: none; }
+  .interruptor input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+                              background: #fff; transition: transform .2s; }
+  .interruptor input:checked { background: var(--green); }
+  .interruptor input:checked::after { transform: translateX(16px); }
+  .leyenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin: 12px 0 0; color: var(--faint); font-size: .8rem; }
+  .leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .leyenda i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+
+  /* ------------------------------------------------------------------ tarjetas laterales */
+  .tarjeta { background: linear-gradient(180deg, var(--card), var(--bg-2)); border: 1px solid var(--line);
+             border-radius: var(--radius); padding: 16px; }
+  .tarjeta > h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: .76rem; font-weight: 750;
+                  letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .contador { margin-left: auto; background: var(--card-3); color: var(--text); border-radius: 999px; padding: 1px 9px;
+              font-size: .74rem; letter-spacing: 0; }
+
+  .prod-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .prod-nombre { font-size: 1.45rem; font-weight: 780; letter-spacing: -.02em; line-height: 1.15; }
+  .reconocido { color: var(--muted); font-size: .85rem; margin-top: 3px; min-height: 1.3em; }
+  .pill.grande { font-size: .82rem; padding: 6px 13px; margin-top: 3px; }
+  .campo { display: grid; gap: 6px; margin-top: 14px; font-size: .78rem; color: var(--muted); font-weight: 650; }
+  select { width: 100%; min-height: 42px; padding: 8px 12px; border-radius: var(--radius-s); border: 1px solid var(--line-2);
+           background: var(--card-2); color: var(--text); font: 500 .92rem var(--font); }
+
+  .metricas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .metrica { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+  .metrica.ancha { grid-column: 1 / -1; }
+  .m-et { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; color: var(--muted);
+          font-size: .74rem; font-weight: 650; }
+  .m-f { font: italic .86rem var(--math); color: var(--amber); white-space: nowrap; }
+  .m-v { margin-top: 2px; font-size: 1.22rem; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barrita { height: 4px; border-radius: 2px; background: var(--line); margin-top: 7px; overflow: hidden; }
+  .barrita i { display: block; height: 100%; width: 0; border-radius: 2px; transition: width .3s; }
+
+  details.plegable { border-top: 1px solid var(--line); }
+  details.plegable:first-of-type { border-top: 0; }
+  details.plegable > summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 2px; cursor: pointer;
+                               font-weight: 650; font-size: .93rem; }
+  details.plegable > summary::-webkit-details-marker { display: none; }
+  details.plegable > summary::after { content: ""; width: 7px; height: 7px; margin-left: 4px; border: solid var(--faint);
+                                      border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .2s; flex: none; }
+  details.plegable[open] > summary::after { transform: rotate(-135deg); }
+  .resumen { margin-left: auto; font-size: .76rem; font-weight: 650; color: var(--faint); }
+  .resumen.ok { color: var(--green); } .resumen.alerta { color: var(--amber); }
+  .cuerpo { padding: 0 2px 14px; display: grid; gap: 10px; }
+  .nota { margin: 0; color: var(--muted); font-size: .84rem; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .rango { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: .86rem; color: var(--muted); }
+  .rango input { grid-column: 1 / -1; width: 100%; accent-color: var(--green); }
+  .rango output { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  details.plegable.porque { margin-top: 12px; border-top: 1px solid var(--line); }
+  .cand { display: grid; grid-template-columns: 7.2em 1fr 3em; gap: 10px; align-items: center; font-size: .84rem; margin: 6px 0; }
+  .cand span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cand-barra { height: 7px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .cand-barra i { display: block; height: 100%; border-radius: 4px; background: var(--green); }
+  .cand:not(:first-child) .cand-barra i { background: var(--faint); }
+  .cand b { text-align: right; font-variant-numeric: tabular-nums; }
+  .porque-meta { margin: 8px 0 0; color: var(--faint); font-size: .8rem; }
+
+  .ultima { width: 100%; display: flex; gap: 12px; align-items: center; text-align: left; padding: 9px; margin-bottom: 10px;
+            border-radius: 12px; border: 1px solid var(--line-2); background: var(--card-2); color: inherit; font: inherit; cursor: pointer; }
+  .ultima:hover { border-color: var(--green); }
+  .ultima img { width: 92px; height: 58px; object-fit: cover; border-radius: 8px; background: #fff; flex: none; }
+  .ultima div { font-size: .84rem; line-height: 1.4; min-width: 0; }
+  .historial { max-height: 230px; overflow: auto; border-radius: 10px; }
   table { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; }
-  th, td { padding: 4px 4px; border-bottom: 1px solid var(--borde); text-align: right; }
-  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
-  th { color: var(--tenue); font-weight: 500; }
-  tr.ver { cursor: pointer; } tr.ver:hover td { background: #23272e; }
-  .historial { max-height: 220px; overflow: auto; }
-  .fila-botones { display: flex; gap: 8px; margin-top: 8px; }
+  th, td { padding: 7px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+  th { position: sticky; top: 0; background: var(--card); color: var(--faint); font-weight: 650; font-size: .74rem; }
+  tr.ver { cursor: pointer; } tr.ver:hover td { background: var(--card-2); }
+  td .pill { font-size: .66rem; padding: 2px 7px; }
+  .vacia { text-align: center !important; color: var(--faint); padding: 18px 6px; }
 
-  dialog { background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 12px; padding: 14px;
-           width: min(1400px, 96vw); }
-  dialog::backdrop { background: rgba(0,0,0,.7); }
-  dialog img { width: 100%; height: auto; border-radius: 6px; background: #fff; display: block; }
-  .aviso { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); opacity: 0;
-           background: #2f343e; border: 1px solid var(--borde); padding: 10px 16px; border-radius: 9px; transition: .25s;
-           max-width: 92vw; pointer-events: none; z-index: 10; }
-  .aviso.ver { opacity: 1; transform: translateX(-50%); }
+  .ensenar { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .conteo { font-size: .82rem; color: var(--muted); }
+
+  /* ------------------------------------------------------------------ diálogos y aviso */
+  dialog { background: var(--card); color: var(--text); border: 1px solid var(--line-2); border-radius: 18px; padding: 0;
+           width: min(1400px, 96vw); max-height: 92vh; }
+  dialog::backdrop { background: rgba(0, 0, 0, .72); }
+  .dlg-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px;
+             border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .dlg-cab h2 { margin: 0; font-size: 1.05rem; }
+  .dlg-cuerpo { padding: 16px; }
+  #dlg img { width: 100%; height: auto; display: block; border-radius: 10px; background: #fff; }
+  #dlgComo { width: min(860px, 96vw); }
+  .diagrama { width: 100%; max-width: 560px; display: block; margin: 0 auto 6px; }
+  .d-relleno { fill: rgba(79, 211, 138, .10); }
+  .d-cortes rect { fill: rgba(79, 211, 138, .10); stroke: rgba(79, 211, 138, .45); stroke-width: 1; }
+  .d-cortes rect.d-sel { fill: rgba(243, 197, 91, .38); stroke: var(--amber); }
+  .d-f { fill: none; stroke: var(--red); stroke-width: 3; }
+  .d-g { fill: none; stroke: var(--blue); stroke-width: 3; }
+  .d-eje { stroke: var(--faint); stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .d-r { stroke: var(--amber); stroke-width: 2; }
+  .diagrama text { font: italic 15px var(--math); fill: var(--text); }
+  .diagrama .d-tf { fill: var(--red); } .diagrama .d-tg { fill: var(--blue); } .diagrama .d-ta { fill: var(--amber); }
+  .formulas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .formulas article { background: var(--card-2); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; }
+  .formulas h3 { margin: 0 0 6px; font-size: .92rem; }
+  .formulas p { margin: 0; color: var(--muted); font-size: .86rem; }
+  .formulas .f { font: italic 1.02rem/1.45 var(--math); color: var(--amber); margin: 2px 0 6px; }
+
+  .aviso { position: fixed; left: 50%; bottom: 22px; z-index: 20; transform: translate(-50%, 16px); opacity: 0;
+           max-width: min(560px, 92vw); padding: 11px 16px; border-radius: 12px; background: #24302b; border: 1px solid var(--line-2);
+           box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font-size: .9rem; transition: opacity .25s, transform .25s; pointer-events: none; }
+  .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ------------------------------------------------------------------ pantallas pequeñas */
+  @media (max-width: 1080px) {
+    .app { grid-template-columns: minmax(0, 1fr); padding: 0 12px 24px; }
+    .lateral { position: static; max-height: none; overflow: visible; min-width: 0; }
+    .controles { position: sticky; bottom: 0; z-index: 5; width: auto; margin: 12px -12px 0;
+                 padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+                 background: rgba(11, 16, 14, .9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+                 border-top: 1px solid var(--line); }
+    .aviso { bottom: calc(86px + env(safe-area-inset-bottom)); }
+  }
+  @media (max-width: 560px) {
+    .cab { padding: 12px 12px 10px; }
+    .marca small { display: none; }
+    #btnComo .txt { display: none; }
+    .lienzo { border-radius: 16px; }
+    .txt-pc { display: none; }
+    /* barra inferior tipo app de cámara: 5 botones iguales con ícono y texto */
+    .controles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .controles .empuje, .controles kbd, .interruptor .txt-op { display: none; }
+    .controles .btn, .controles .interruptor { flex-direction: column; justify-content: center; gap: 4px; min-height: 58px;
+                                              padding: 6px 2px; font-size: .72rem; border-radius: 14px; }
+    .controles .interruptor { border: 1px solid var(--line-2); background: var(--card-2); color: var(--text); }
+    .controles .btn svg { width: 21px; height: 21px; }
+    #txtCamara { text-transform: capitalize; }
+    #btnCapturar { order: 2; } #btnGirar { order: 3; } .controles .interruptor { order: 4; }
+    .controles label[for="archivo"] { order: 1; }
+    .hud-met { gap: 2px 12px; font-size: .8rem; }
+    .metricas { gap: 6px; }
+    .m-v { font-size: 1.1rem; }
+    .vacio, .lienzo.sin-imagen { min-height: 470px; }
+  }
+  @media (hover: none), (pointer: coarse) { kbd, .solo-teclado { display: none !important; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Inspección automatizada de productos agrícolas</h1>
-  <p>Cálculo Integral: área entre curvas <b>∫(f−g)dx</b>, volumen por discos <b>π∫r²dx</b> y sumas de Riemann sobre los píxeles de la cámara.</p>
+<!-- íconos -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-camara" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></symbol>
+  <symbol id="i-detener" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+  <symbol id="i-girar" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.4-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.4 6.4L3 16"/><path d="M3 21v-5h5"/></symbol>
+  <symbol id="i-imagen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-obturador" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></symbol>
+  <symbol id="i-discos" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6"/><path d="M7 7.6v8.8M12 6v12M17 7.6v8.8"/></symbol>
+  <symbol id="i-mascara" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 3h5a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4h-5z" fill="currentColor" fill-opacity=".35"/></symbol>
+  <symbol id="i-regla" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2m1-5 2 2m1-5 2 2"/></symbol>
+  <symbol id="i-capas" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+  <symbol id="i-chispa" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+  <symbol id="i-descargar" viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></symbol>
+  <symbol id="i-papelera" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-cerrar" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-lista" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 6h9m4 0h3M4 12h3m4 0h9M4 18h11m4 0h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+  <symbol id="i-objetivo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+</svg>
+
+<header class="cab">
+  <a class="marca" href="/" aria-label="Inspección agrícola: inicio">
+    <span class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="26" height="26"><path d="M19.5 7.2c-2.3-1-4.3.2-4.8 2.7l-2.6 12.6c-.5 2.4-2.6 3.3-4.6 2.3" fill="none" stroke="#062012" stroke-width="2.8" stroke-linecap="round"/><path d="M19.6 7.4c2.2-2.9 5.4-3.4 7-3-.1 1.9-1.6 4.9-4.8 5.7-1.1.3-2 0-2.2-.8" fill="#0b3a20"/></svg>
+    </span>
+    <span><strong>Inspección agrícola</strong><small>Áreas y volúmenes con cálculo integral</small></span>
+  </a>
+  <button id="btnComo" class="btn fantasma"><svg class="i"><use href="#i-info"/></svg><span class="txt">¿Cómo funciona?</span></button>
 </header>
 
-<main>
-  <section>
-    <div class="barra">
-      <button id="btnCamara" class="principal">Iniciar cámara</button>
-      <button id="btnGirar" disabled>Cambiar cámara</button>
-      <label class="boton" for="archivo">Subir foto</label>
-      <input id="archivo" type="file" accept="image/*">
-      <button id="btnZoom" class="activo">Zoom al producto <kbd>Z</kbd></button>
-      <button id="btnAuto" class="activo">Captura automática <kbd>A</kbd></button>
-    </div>
-    <div id="lienzo" class="lienzo">
+<main class="app">
+  <section id="escenario" class="escenario sin-modo" aria-label="Cámara">
+    <div id="lienzo" class="lienzo sin-imagen">
       <canvas id="vista"></canvas>
-      <div id="vacio" class="vacio">Apunte la cámara al producto: se detecta solo, en cualquier parte de la imagen.<br>
-        Pulse <b>Iniciar cámara</b> o <b>Subir foto</b>.</div>
+
+      <div id="hudSup" class="hud-sup" hidden>
+        <div id="chip" class="chip" data-tipo="buscando"><span class="punto"></span><span id="chipTexto">Buscando producto…</span><i id="chipProg" class="chip-prog"></i></div>
+        <div class="hud-iconos">
+          <button id="btnZoom" class="ico activo" title="Zoom al producto (Z)" aria-label="Zoom al producto" aria-pressed="true"><svg class="i"><use href="#i-zoom"/></svg></button>
+          <button id="btnDiscos" class="ico activo" title="Mostrar discos (D)" aria-label="Mostrar discos" aria-pressed="true"><svg class="i"><use href="#i-discos"/></svg></button>
+          <button id="btnMascara" class="ico" title="Ver máscara (M)" aria-label="Ver máscara" aria-pressed="false"><svg class="i"><use href="#i-mascara"/></svg></button>
+        </div>
+      </div>
+
+      <div id="hudRes" class="hud-res" hidden>
+        <div class="hud-fila"><span id="hudProd" class="hud-prod">—</span><span id="hudEstado" class="pill">—</span></div>
+        <div class="hud-met">
+          <span>Área <b id="hudArea">—</b></span><span>Volumen <b id="hudVol">—</b></span><span>Peso <b id="hudPeso">—</b></span>
+        </div>
+      </div>
+
+      <div id="vacio" class="vacio">
+        <div class="vacio-in">
+          <svg viewBox="0 0 120 80" width="132" height="88" aria-hidden="true">
+            <defs><clipPath id="cf"><ellipse cx="60" cy="40" rx="42" ry="30"/></clipPath></defs>
+            <ellipse cx="60" cy="40" rx="42" ry="30" fill="rgba(79,211,138,.12)" stroke="#4fd38a" stroke-width="2.5"/>
+            <g clip-path="url(#cf)" stroke="#f3c55b" stroke-width="1.6" opacity=".9">
+              <path d="M30 0v80M40 0v80M50 0v80M60 0v80M70 0v80M80 0v80M90 0v80"/>
+            </g>
+            <path d="M10 40h100" stroke="#5bd0f0" stroke-width="1.6" stroke-dasharray="4 4"/>
+          </svg>
+          <h2>Apunte la cámara a una fruta o verdura</h2>
+          <p>El programa la encuentra sola, la reconoce y calcula su área, volumen y peso con integrales.</p>
+          <ol class="pasos">
+            <li><span class="n">1</span>Póngala sobre un fondo de otro color, con buena luz.</li>
+            <li><span class="n">2</span>Déjela quieta un segundo: la lámina de cálculo se guarda sola.</li>
+            <li><span class="n">3</span>Calibre una vez con una tarjeta para medir en centímetros reales.</li>
+          </ol>
+          <div class="vacio-botones">
+            <button id="btnCamara2" class="btn primario"><svg class="i"><use href="#i-camara"/></svg>Iniciar cámara</button>
+            <label class="btn" for="archivo"><svg class="i"><use href="#i-imagen"/></svg>Subir foto</label>
+          </div>
+          <div class="ejemplos" id="ejemplos">¿Sin cámara? Pruebe un ejemplo:</div>
+        </div>
+      </div>
     </div>
     <video id="video" class="oculto" playsinline muted></video>
     <canvas id="foto" class="oculto"></canvas>
-    <p class="ayuda">Contorno en verde · manchas (daño) en rojo · discos en amarillo · eje de revolución en celeste.
-      Con la captura automática, deje la fruta quieta ~1 s y se guarda sola.<br>
-      Teclas: <kbd>0</kbd> automático · <kbd>1-9</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
-      <kbd>E</kbd> enseñar · <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
+
+    <div class="controles">
+      <button id="btnCamara" class="btn primario"><svg class="i"><use id="icoCamara" href="#i-camara"/></svg><span id="txtCamara"><span class="txt-pc">Iniciar </span>cámara</span></button>
+      <button id="btnGirar" class="btn" disabled title="Cambiar entre cámara trasera y frontal"><svg class="i"><use href="#i-girar"/></svg><span>Cambiar</span></button>
+      <label class="btn" for="archivo" title="Analizar una foto"><svg class="i"><use href="#i-imagen"/></svg><span>Foto</span></label>
+      <input id="archivo" type="file" accept="image/*">
+      <span class="empuje"></span>
+      <label class="interruptor" title="Captura automática (A)"><input id="chkAuto" type="checkbox" checked><span>Auto<span class="txt-op">mática</span></span></label>
+      <button id="btnCapturar" class="btn contorno"><svg class="i"><use href="#i-obturador"/></svg>Capturar <kbd>C</kbd></button>
+    </div>
+    <p class="leyenda">
+      <span><i style="background:#4fd38a"></i>Contorno</span><span><i style="background:#ef5b57"></i>Daño</span>
+      <span><i style="background:#f3c55b"></i>Discos</span><span><i style="background:#5bd0f0"></i>Eje</span>
+    </p>
   </section>
 
-  <aside class="panel">
-    <h2>Producto</h2>
-    <select id="producto"></select>
-    <div id="reconocido" class="reconocido"></div>
-    <div id="porque" class="porque"></div>
-    <div id="estado" class="estado">—<small>Esperando imagen</small></div>
-    <dl>
-      <dt>Área <span class="f">∫(f−g)dx</span></dt><dd id="v_area">—</dd>
-      <dt>Volumen <span id="f_vol" class="f">π∫r²dx</span></dt><dd id="v_vol">—</dd>
-      <dt>Peso estimado</dt><dd id="v_peso">—</dd>
-      <dt id="t_dim">Largo × diámetro</dt><dd id="v_dim">—</dd>
-      <dt>Daño</dt><dd id="v_dano">—</dd>
-      <dt>Madurez</dt><dd id="v_mad">—</dd>
-      <dt>Calibre</dt><dd id="v_cal">—</dd>
-    </dl>
+  <aside class="lateral">
+    <section class="tarjeta" aria-label="Resultado">
+      <div class="prod-cab">
+        <div style="min-width:0">
+          <div id="prodNombre" class="prod-nombre">Sin producto</div>
+          <div id="reconocido" class="reconocido">Inicie la cámara o suba una foto</div>
+        </div>
+        <span id="estado" class="pill grande">—</span>
+      </div>
 
-    <h2>Acciones</h2>
-    <div class="acciones">
-      <button id="btnCapturar" class="principal ancho">Capturar lámina de cálculo <kbd>C</kbd></button>
-      <button id="btnCalibrar">Calibrar <kbd>K</kbd></button>
-      <button id="btnFondo">Fondo <kbd>B</kbd></button>
-      <button id="btnDiscos" class="activo">Discos <kbd>D</kbd></button>
-      <button id="btnMascara">Máscara <kbd>M</kbd></button>
-    </div>
+      <div class="metricas">
+        <div class="metrica"><div class="m-et">Área <span class="m-f">∫(f−g)dx</span></div><div id="v_area" class="m-v">—</div></div>
+        <div class="metrica"><div class="m-et">Volumen <span id="f_vol" class="m-f">π∫r²dx</span></div><div id="v_vol" class="m-v">—</div></div>
+        <div class="metrica"><div class="m-et">Peso estimado <span class="m-f">m = ρV</span></div><div id="v_peso" class="m-v">—</div></div>
+        <div class="metrica"><div class="m-et">Calibre</div><div id="v_cal" class="m-v">—</div></div>
+        <div class="metrica ancha"><div class="m-et"><span id="t_dim">Largo × diámetro</span></div><div id="v_dim" class="m-v">—</div></div>
+        <div class="metrica"><div class="m-et">Daño</div><div id="v_dano" class="m-v">—</div><div class="barrita"><i id="barDano" style="background:var(--red)"></i></div></div>
+        <div class="metrica"><div class="m-et">Madurez</div><div id="v_mad" class="m-v">—</div><div class="barrita"><i id="barMad" style="background:var(--green)"></i></div></div>
+      </div>
 
-    <h2>Escala</h2>
-    <div id="escala" class="escala"></div>
-    <p class="nota">Para calibrar, ponga <b>sola</b> una tarjeta (carnet o crédito, 8.56 cm) frente a la cámara, a la misma
-      distancia que las frutas, y pulse Calibrar. <button id="btnOlvidar" class="enlace">Borrar calibración</button></p>
+      <label class="campo">Producto
+        <select id="producto"></select>
+      </label>
 
-    <h2>Detección</h2>
-    <label class="rango">Sensibilidad <span id="t_sens">50</span><input id="sens" type="range" min="0" max="100" value="50"></label>
-    <p class="nota">Súbala si no detecta frutas pálidas; bájela si toma sombras u otros objetos.
-      Para productos muy parecidos al fondo use <b>Fondo</b>: con la escena vacía púlselo y luego ponga el producto.</p>
+      <details id="porqueDet" class="plegable porque">
+        <summary><span id="porqueResumen">¿Por qué este producto?</span></summary>
+        <div id="porque" class="cuerpo"></div>
+      </details>
+    </section>
 
-    <h2>Enseñar al reconocedor</h2>
-    <p class="nota" style="margin:0 0 8px">Si confunde productos (p. ej. manzana con limón), ponga una fruta, elija qué es
-      y pulse <b>Guardar ejemplo</b>. Con 2-3 ejemplos de cada una aprende sus frutas y su luz.</p>
-    <div class="ensenar">
-      <select id="ensenarProd"></select>
-      <button id="btnEnsenar">Guardar ejemplo <kbd>E</kbd></button>
-    </div>
-    <div id="conteo" class="conteo"></div>
+    <section class="tarjeta" aria-label="Capturas">
+      <h2><svg class="i"><use href="#i-lista"/></svg>Capturas <span id="nCapt" class="contador">0</span></h2>
+      <button id="ultima" class="ultima" hidden><img id="ultimaImg" alt="Última lámina capturada"><div id="ultimaTxt"></div></button>
+      <div class="historial"><table>
+        <thead><tr><th>Hora</th><th>Producto</th><th>cm²</th><th>cm³</th><th>g</th><th>Estado</th></tr></thead>
+        <tbody id="tabla"></tbody>
+      </table></div>
+      <div class="fila" style="margin-top:10px">
+        <button id="btnCsv" class="btn pequeno"><svg class="i"><use href="#i-descargar"/></svg>Descargar CSV</button>
+        <button id="btnBorrar" class="btn pequeno fantasma"><svg class="i"><use href="#i-papelera"/></svg>Borrar</button>
+      </div>
+    </section>
 
-    <h2>Capturas</h2>
-    <div id="ultima" class="ultima"><img id="ultimaImg" alt="Última lámina capturada"><div id="ultimaTxt"></div></div>
-    <div class="historial"><table>
-      <thead><tr><th>Hora</th><th>Producto</th><th>cm²</th><th>cm³</th><th>g</th><th>Daño</th><th>Estado</th></tr></thead>
-      <tbody id="tabla"></tbody>
-    </table></div>
-    <div class="fila-botones">
-      <button id="btnCsv">Descargar CSV</button>
-      <button id="btnBorrar">Borrar</button>
-    </div>
+    <section class="tarjeta" aria-label="Ajustes">
+      <h2><svg class="i"><use href="#i-ajustes"/></svg>Ajustes</h2>
+      <details class="plegable">
+        <summary><svg class="i"><use href="#i-regla"/></svg>Escala<span id="escalaResumen" class="resumen">—</span></summary>
+        <div class="cuerpo">
+          <p id="escala" class="nota"></p>
+          <p class="nota">Ponga <b>sola</b> una tarjeta (carnet o crédito, 8.56 cm) frente a la cámara, a la misma distancia que los productos, y pulse Calibrar.</p>
+          <div class="fila">
+            <button id="btnCalibrar" class="btn pequeno"><svg class="i"><use href="#i-regla"/></svg>Calibrar con tarjeta <kbd>K</kbd></button>
+            <button id="btnOlvidar" class="btn pequeno fantasma">Borrar calibración</button>
+          </div>
+        </div>
+      </details>
+      <details class="plegable">
+        <summary><svg class="i"><use href="#i-objetivo"/></svg>Detección<span id="detResumen" class="resumen">automática</span></summary>
+        <div class="cuerpo">
+          <label class="rango">Sensibilidad <output id="t_sens">50</output><input id="sens" type="range" min="0" max="100" value="50"></label>
+          <p class="nota">Súbala si no detecta productos pálidos; bájela si toma sombras u otros objetos.</p>
+          <div class="fila"><button id="btnFondo" class="btn pequeno"><svg class="i"><use href="#i-capas"/></svg><span id="txtFondo">Capturar fondo vacío</span> <kbd>B</kbd></button></div>
+          <p class="nota">Para productos del mismo color que el fondo (cebolla blanca sobre hoja blanca): con la escena vacía pulse <b>Capturar fondo vacío</b> y luego ponga el producto.</p>
+        </div>
+      </details>
+      <details class="plegable">
+        <summary><svg class="i"><use href="#i-chispa"/></svg>Enseñar al reconocedor<span id="ejResumen" class="resumen"></span></summary>
+        <div class="cuerpo">
+          <p class="nota">Si confunde productos, póngalo frente a la cámara, elija qué es y pulse <b>Guardar ejemplo</b>. Con 2-3 ejemplos de cada uno aprende sus productos y su luz.</p>
+          <div class="ensenar">
+            <select id="ensenarProd" aria-label="Producto a enseñar"></select>
+            <button id="btnEnsenar" class="btn pequeno">Guardar ejemplo <kbd>E</kbd></button>
+          </div>
+          <div id="conteo" class="conteo"></div>
+        </div>
+      </details>
+      <details class="plegable solo-teclado">
+        <summary><svg class="i"><use href="#i-lista"/></svg>Atajos de teclado</summary>
+        <div class="cuerpo nota">
+          <span><kbd>0</kbd> reconocer solo · <kbd>1</kbd>-<kbd>9</kbd> elegir producto · <kbd>C</kbd> capturar · <kbd>A</kbd> captura automática ·
+          <kbd>Z</kbd> zoom · <kbd>D</kbd> discos · <kbd>M</kbd> máscara · <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>E</kbd> enseñar</span>
+        </div>
+      </details>
+    </section>
   </aside>
 </main>
 
-<dialog id="dlg">
-  <img id="lamina" alt="Lámina de cálculo integral de la captura">
-  <div class="fila-botones" style="justify-content:flex-end">
-    <a id="descargar" class="boton" download>Descargar PNG</a>
-    <button id="cerrar">Cerrar</button>
+<dialog id="dlg" aria-label="Lámina de cálculo">
+  <div class="dlg-cab">
+    <h2 id="dlgTitulo">Lámina de cálculo</h2>
+    <div class="fila">
+      <a id="descargar" class="btn pequeno primario" download><svg class="i"><use href="#i-descargar"/></svg>Descargar PNG</a>
+      <button class="ico" data-cerrar aria-label="Cerrar"><svg class="i"><use href="#i-cerrar"/></svg></button>
+    </div>
+  </div>
+  <div class="dlg-cuerpo"><img id="lamina" alt="Lámina de cálculo integral de la captura"></div>
+</dialog>
+
+<dialog id="dlgComo" aria-label="Cómo funciona">
+  <div class="dlg-cab">
+    <h2>¿Cómo calcula?</h2>
+    <button class="ico" data-cerrar aria-label="Cerrar"><svg class="i"><use href="#i-cerrar"/></svg></button>
+  </div>
+  <div class="dlg-cuerpo">
+    <svg class="diagrama" viewBox="0 0 360 184" role="img" aria-label="Silueta de un producto entre las curvas f(x) y g(x), dividida en rectángulos de Riemann; uno resaltado de ancho delta x y radio r">
+      <defs><clipPath id="clipForma"><path d="M40 92 C 70 30, 280 24, 320 92 C 280 154, 75 152, 40 92 Z"/></clipPath></defs>
+      <path d="M40 92 C 70 30, 280 24, 320 92 C 280 154, 75 152, 40 92 Z" class="d-relleno"/>
+      <g clip-path="url(#clipForma)" class="d-cortes">
+        <rect x="40" y="0" width="20" height="184"/><rect x="60" y="0" width="20" height="184"/><rect x="80" y="0" width="20" height="184"/>
+        <rect x="100" y="0" width="20" height="184"/><rect x="120" y="0" width="20" height="184"/><rect x="140" y="0" width="20" height="184"/>
+        <rect x="160" y="0" width="20" height="184"/><rect x="180" y="0" width="20" height="184" class="d-sel"/><rect x="200" y="0" width="20" height="184"/>
+        <rect x="220" y="0" width="20" height="184"/><rect x="240" y="0" width="20" height="184"/><rect x="260" y="0" width="20" height="184"/>
+        <rect x="280" y="0" width="20" height="184"/><rect x="300" y="0" width="20" height="184"/>
+      </g>
+      <line x1="18" y1="92" x2="342" y2="92" class="d-eje"/>
+      <path d="M40 92 C 70 30, 280 24, 320 92" class="d-f"/>
+      <path d="M40 92 C 75 152, 280 154, 320 92" class="d-g"/>
+      <line x1="190" y1="92" x2="190" y2="44" class="d-r"/>
+      <text x="252" y="36" class="d-tf">f(x)</text>
+      <text x="252" y="162" class="d-tg">g(x)</text>
+      <text x="196" y="72" class="d-ta">r</text>
+      <text x="180" y="180" class="d-ta">Δx</text>
+      <text x="326" y="84">eje</text>
+    </svg>
+    <div class="formulas">
+      <article><h3>1. La silueta</h3><p>La cámara separa el producto del fondo y lo gira para que su eje mayor quede horizontal. En cada columna de píxeles x se miden el borde superior f(x) y el inferior g(x).</p></article>
+      <article><h3>2. Área entre curvas</h3><p class="f">A = ∫ₐᵇ [f(x) − g(x)] dx</p><p>Cada columna de píxeles es un rectángulo de Riemann de ancho Δx = 1 píxel.</p></article>
+      <article><h3>3. Volumen por discos</h3><p class="f">V = π ∫ₐᵇ r(x)² dx,  r = (f − g) / 2</p><p>Al girar la silueta alrededor del eje se forma el sólido; cada rectángulo se vuelve un disco de volumen π r² Δx.</p></article>
+      <article><h3>4. Productos curvos (banano)</h3><p class="f">L = ∫ √(1 + c′(x)²) dx,  V = π ∫ r⊥(s)² ds</p><p>El eje es la línea media c(x) = (f + g)/2; el largo es su longitud de arco y los discos van perpendiculares a la curva.</p></article>
+      <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
+      <article><h3>6. Peso, daño y madurez</h3><p class="f">m = ρ V,  A_daño ≈ Σ ΔA</p><p>El peso usa la densidad de cada producto; el daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
+    </div>
   </div>
 </dialog>
-<div id="aviso" class="aviso"></div>
+
+<div id="aviso" class="aviso" role="status" aria-live="polite"></div>
 
 <script>
 const $ = id => document.getElementById(id);
 const MAX_ANCHO = 960;              // ancho de los cuadros enviados (la escala px/cm depende de él)
 const PX_DEFECTO = 12;
 const T_QUIETO = 1.2;               // segundos quieto para la captura automática
-const COLOR_ESTADO = { BUENO: "#1a9850", REGULAR: "#e08e0b", INMADURO: "#2e86c1", DESCARTE: "#c0392b" };
+const COLOR_ESTADO = { BUENO: "#2fb36b", REGULAR: "#e9a23b", INMADURO: "#4a90d9", DESCARTE: "#e0524d" };
 const CLAVES = ["area_cm2", "volumen_cm3", "peso_g", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct"];
+// fotos sintéticas de ejemplo (escala conocida) para probar sin cámara
+const EJEMPLOS = { naranja: "Naranja", "manzana-verde": "Manzana verde", banano: "Banano", tomate: "Tomate dañado", zanahoria: "Zanahoria" };
+const ESCALA_EJEMPLO = 30;
+const COLORES = { contorno: "#4fd38a", dano: "rgba(239,91,87,.55)", discos: "#f3c55b", eje: "#5bd0f0" };
 
 const st = {
   productos: [], producto: +(localStorage.producto ?? -1),
   px: parseFloat(localStorage.px_por_cm) || PX_DEFECTO, calibrado: !!localStorage.px_por_cm,
+  escalaFija: null,                 // px/cm conocida (solo con las fotos de ejemplo)
   fondo: null, discos: true, mascara: false, sens: 50, zoom: true, autoCap: true,
   modo: null, stream: null, facing: "environment", suav: null,
   det: null, mascaraImg: null, ultimaDet: 0, caja: null,
@@ -208,6 +543,16 @@ function aviso(msg, ms = 3200) {
 }
 
 // ---------------------------------------------------------------- fuentes de imagen
+function ponerModo(modo) {
+  st.modo = modo;
+  $("lienzo").classList.toggle("sin-imagen", !modo);
+  $("escenario").classList.toggle("sin-modo", !modo);
+  $("vacio").hidden = !!modo;
+  $("hudSup").hidden = !modo;
+  if (!modo) { $("hudRes").hidden = true; $("lienzo").style.aspectRatio = ""; delete $("lienzo").dataset.prop; }
+  actualizarChip();
+}
+
 async function iniciarCamara() {
   if (!navigator.mediaDevices?.getUserMedia) {
     aviso("Este navegador no permite usar la cámara aquí (se necesita HTTPS o localhost)."); return;
@@ -223,20 +568,21 @@ async function iniciarCamara() {
   }
   video.srcObject = st.stream;
   await video.play();
-  reiniciarPresencia(); st.modo = "camara"; st.caja = null;
-  $("vacio").style.display = "none";
-  $("btnGirar").disabled = false; $("btnCamara").textContent = "Detener cámara";
+  st.escalaFija = null; mostrarEscala();
+  reiniciarPresencia(); st.det = null; st.caja = null; ponerModo("camara");
+  $("btnGirar").disabled = false; $("txtCamara").innerHTML = 'Detener<span class="txt-pc"> cámara</span>'; $("icoCamara").setAttribute("href", "#i-detener");
   bucle();
 }
 
 function detenerCamara() {
   if (st.stream) st.stream.getTracks().forEach(t => t.stop());
   st.stream = null; video.srcObject = null;
-  if (st.modo === "camara") { st.modo = null; st.det = null; }
-  $("btnGirar").disabled = true; $("btnCamara").textContent = "Iniciar cámara";
+  if (st.modo === "camara") { st.det = null; ponerModo(null); }
+  $("btnGirar").disabled = true; $("txtCamara").innerHTML = '<span class="txt-pc">Iniciar </span>cámara'; $("icoCamara").setAttribute("href", "#i-camara");
 }
 
-function cargarFoto(archivo) {
+/** Carga una foto (archivo o blob). escala: px/cm conocida (fotos de ejemplo). */
+function cargarFoto(archivo, { escala = null, titulo = null } = {}) {
   const img = new Image();
   img.onload = () => {
     detenerCamara();
@@ -244,12 +590,22 @@ function cargarFoto(archivo) {
     foto.width = Math.round(img.naturalWidth * esc); foto.height = Math.round(img.naturalHeight * esc);
     foto.getContext("2d").drawImage(img, 0, 0, foto.width, foto.height);
     URL.revokeObjectURL(img.src);
-    st.modo = "foto"; st.fondo = null; st.det = null; st.caja = null; reiniciarPresencia(); marcarBotones();
-    $("vacio").style.display = "none";
+    st.escalaFija = escala ? escala * esc : null; mostrarEscala();
+    st.fondo = null; st.det = null; st.caja = null; reiniciarPresencia(); marcarBotones();
+    ponerModo("foto");
+    if (titulo) aviso(`Ejemplo sintético: ${titulo} (escala conocida de ${escala} px/cm).`, 3500);
     analizarUnaVez();
   };
   img.onerror = () => aviso("No se pudo leer la imagen.");
   img.src = URL.createObjectURL(archivo);
+}
+
+async function cargarEjemplo(clave) {
+  try {
+    const resp = await fetch(`/ejemplos/${clave}.jpg`);
+    if (!resp.ok) throw new Error(resp.statusText);
+    cargarFoto(await resp.blob(), { escala: ESCALA_EJEMPLO, titulo: EJEMPLOS[clave] });
+  } catch (e) { aviso("No se pudo cargar el ejemplo."); }
 }
 
 /** Tamaño del cuadro que se envía al servidor (todas las coordenadas usan este espacio). */
@@ -282,8 +638,8 @@ function formulario(blob, extra = {}) {
   fd.append("imagen", blob, "cuadro.jpg");
   if (st.fondo) fd.append("fondo", st.fondo, "fondo.jpg");
   fd.append("producto", productoEnviar()); fd.append("auto", st.producto < 0 ? 1 : 0);
-  fd.append("px_por_cm", st.px); fd.append("sensibilidad", st.sens);
-  fd.append("calibrado", st.calibrado ? 1 : 0);                       // con calibración el tamaño ayuda a reconocer
+  fd.append("px_por_cm", st.escalaFija ?? st.px); fd.append("sensibilidad", st.sens);
+  fd.append("calibrado", st.escalaFija || st.calibrado ? 1 : 0);       // con calibración el tamaño ayuda a reconocer
   if (st.ejemplos.length) fd.append("ejemplos", JSON.stringify(st.ejemplos));
   for (const [k, v] of Object.entries(extra)) fd.append(k, v);
   return fd;
@@ -323,7 +679,7 @@ function procesar(d) {
   const ahora = performance.now() / 1000;
   if (!d.detectado) {
     if (ahora - st.ultimaDet > 1.0) reiniciarPresencia();     // se retiró el producto
-    mostrar(d); return;
+    mostrar(d); actualizarChip(); return;
   }
   st.ultimaDet = ahora;
   // votación del reconocimiento (evita que salte entre productos cuadro a cuadro)
@@ -338,7 +694,7 @@ function procesar(d) {
   st.muestras.push(m);
   st.muestras = st.muestras.filter(s => ahora - s.t < 3);
 
-  // ¿cambió de producto después de capturar? (otra fruta en el mismo lugar)
+  // ¿cambió de producto después de capturar? (otro producto en el mismo lugar)
   const c = st.capturada;
   if (c && (Math.abs(m.area - c.area) / c.area > 0.3 || Math.hypot(m.cx - c.cx, m.cy - c.cy) > 0.15)) reiniciarPresencia();
 
@@ -356,6 +712,7 @@ function procesar(d) {
     st.capturada = { area: m.area, cx: m.cx, cy: m.cy };
     capturar(true);
   }
+  actualizarChip();
 }
 
 function suavizar(prev, r, a = 0.3) {
@@ -367,47 +724,84 @@ function suavizar(prev, r, a = 0.3) {
 const fmt = (v, dec) => v == null ? "—" : v.toLocaleString("es", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const nombre = id => st.productos[id]?.nombre ?? "—";
 
+/** Indicador sobre la cámara: buscando / manténgalo quieto (con progreso) / capturado. */
+function actualizarChip() {
+  if (!st.modo) return;
+  const d = st.det;
+  let tipo, txt;
+  if (st.capturando) { tipo = "capturando"; txt = "Generando lámina…"; }
+  else if (!d?.detectado) { tipo = "buscando"; txt = st.modo === "foto" ? (d ? "No se encontró un producto" : "Analizando…") : "Buscando producto…"; }
+  else if (st.autoCap && st.capturada) { tipo = "capturado"; txt = st.modo === "foto" ? "Lámina guardada" : "Capturado · ponga otro producto"; }
+  else if (st.autoCap && st.modo === "camara") { tipo = "quieto"; txt = st.progreso > 0.05 ? "Manténgalo quieto…" : "Producto detectado"; }
+  else { tipo = "listo"; txt = "Producto detectado"; }
+  $("chip").dataset.tipo = tipo; $("chipTexto").textContent = txt;
+  $("chipProg").style.width = (tipo === "quieto" ? Math.round(st.progreso * 100) : 0) + "%";
+}
+
+function pintarEstado(estado) {
+  for (const id of ["estado", "hudEstado"]) {
+    const e = $(id); e.textContent = estado || "—"; e.style.background = estado ? COLOR_ESTADO[estado] || "" : "";
+  }
+}
+
 function mostrar(d) {
-  const e = $("estado");
+  const ids = ["v_area", "v_vol", "v_peso", "v_dim", "v_dano", "v_mad", "v_cal"];
   if (!d.detectado) {
-    e.style.background = ""; e.innerHTML = "—<small>Buscando producto…</small>";
-    $("reconocido").textContent = ""; $("porque").textContent = "";
-    ["v_area", "v_vol", "v_peso", "v_dim", "v_dano", "v_mad", "v_cal"].forEach(id => $(id).textContent = "—");
+    $("prodNombre").textContent = "Sin producto";
+    $("reconocido").textContent = st.modo === "foto" ? "No se encontró un producto en la foto" : "Buscando producto…";
+    pintarEstado(null); $("hudRes").hidden = true;
+    ids.forEach(id => $(id).textContent = "—");
+    $("barDano").style.width = $("barMad").style.width = "0";
+    $("porque").innerHTML = ""; $("porqueResumen").textContent = "¿Por qué este producto?";
     return;
   }
-  const r = d.resultados;
+  const r = d.resultados, rec0 = d.reconocimiento || {};
   const s = st.suav = st.modo === "camara" ? suavizar(st.suav, r) : { ...r };
+  $("prodNombre").textContent = r.producto;
   if (st.producto < 0) {
-    const [id, v] = productoEstable();
-    $("reconocido").textContent = id >= 0 ? `Reconocido automáticamente: ${nombre(id)} (${Math.round(v * 100)} %)`
-                                          : "Reconociendo producto…";
-  } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere: ${nombre(d.reconocido_id)}`;
-  // por qué: candidatos, método y rasgos medidos (para revisar las confusiones)
-  const rec = d.reconocimiento || {}, ra = d.rasgos || {};
-  const cand = (rec.candidatos || []).map(([n, v]) => `${n} ${Math.round(v * 100)} %`).join(" · ");
-  const tipo = ra.alarg < 1.12 ? "redonda" : ra.alarg < 2 ? "alargada" : "muy alargada";
-  const forma = ra.alarg == null ? "" : ` · forma ${ra.alarg.toFixed(2)} (${tipo}${ra.curvatura >= 0.06 && ra.alarg >= 1.8 ? ", curva" : ""})`;
-  const tam = st.calibrado && ra.diam_cm ? ` · Ø ${ra.diam_cm.toFixed(1)} cm` : "";
-  $("porque").textContent = `Por qué: ${cand} — ${rec.metodo === "ejemplos" ? "por sus ejemplos" : "por reglas"}` +
-    `${rec.motivo ? " (" + rec.motivo + ")" : ""}${forma}${tam}`;
-  e.style.background = COLOR_ESTADO[r.estado] || "";
-  e.innerHTML = `${r.estado}<small>${r.producto}</small>`;
+    const [id] = productoEstable();
+    $("reconocido").textContent = id >= 0 ? (rec0.metodo === "ejemplos" ? "Reconocido con sus ejemplos" : "Reconocido automáticamente")
+                                          : "Reconociendo…";
+  } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere ${nombre(d.reconocido_id)}`;
+  pintarEstado(r.estado);
+
+  const curvo = r.metodo_volumen === "curvo";
+  $("t_dim").textContent = curvo ? "Largo sobre el arco × grosor" : "Largo × diámetro";
+  $("f_vol").textContent = curvo ? "π∫r²ds" : "π∫r²dx";
   $("v_area").textContent = fmt(s.area_cm2, 1) + " cm²";
   $("v_vol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
   $("v_peso").textContent = fmt(s.peso_g, 0) + " g";
-  const curvo = r.metodo_volumen === "curvo";
-  $("t_dim").textContent = curvo ? "Largo (arco) × grosor" : "Largo × diámetro";
-  $("f_vol").textContent = curvo ? "π∫r²ds" : "π∫r²dx";
   $("v_dim").textContent = `${fmt(s.largo_cm, 1)} × ${fmt(s.diametro_cm, 1)} cm`;
   $("v_dano").textContent = fmt(s.dano_pct, 1) + " %";
   $("v_mad").textContent = s.madurez_pct == null ? "no aplica" : fmt(s.madurez_pct, 0) + " %";
   $("v_cal").textContent = r.calibre;
+  $("barDano").style.width = Math.min(100, (s.dano_pct || 0) * 4) + "%";
+  $("barMad").style.width = (s.madurez_pct ?? 0) + "%";
+
+  // resumen sobre la cámara (visible en el celular sin bajar)
+  $("hudProd").textContent = r.producto;
+  $("hudArea").textContent = fmt(s.area_cm2, 1) + " cm²";
+  $("hudVol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
+  $("hudPeso").textContent = fmt(s.peso_g, 0) + " g";
+  $("hudRes").hidden = false;
+
+  // por qué: candidatos, método y rasgos medidos (para revisar las confusiones)
+  const rec = d.reconocimiento || {}, ra = d.rasgos || {};
+  const cand = rec.candidatos || [];
+  const tipo = ra.alarg < 1.12 ? "redonda" : ra.alarg < 2 ? "alargada" : "muy alargada";
+  const forma = ra.alarg == null ? "" : ` · forma ${tipo}${ra.curvatura >= 0.06 && ra.alarg >= 1.8 ? " y curva" : ""} (${ra.alarg.toFixed(2)})`;
+  const tam = (st.calibrado || st.escalaFija) && ra.diam_cm ? ` · grosor ${ra.diam_cm.toFixed(1)} cm` : "";
+  $("porqueResumen").textContent = cand.length ? `¿Por qué ${cand[0][0]}? · ${Math.round(cand[0][1] * 100)} %` : "¿Por qué este producto?";
+  $("porque").innerHTML = cand.map(([n, v]) =>
+      `<div class="cand"><span>${n}</span><span class="cand-barra"><i style="width:${Math.round(v * 100)}%"></i></span><b>${Math.round(v * 100)} %</b></div>`).join("") +
+    `<p class="porque-meta">${rec.metodo === "ejemplos" ? "Decidido por sus ejemplos enseñados" : "Decidido por las reglas de color y forma"}` +
+    `${rec.motivo ? " (" + rec.motivo + ")" : ""}${forma}${tam}.</p>`;
 }
 
 // ---------------------------------------------------------------- dibujo con zoom al producto
 function cajaObjetivo(fw, fh) {
   const d = st.det, ahora = performance.now() / 1000;
-  if (!st.zoom || !d?.detectado || ahora - st.ultimaDet > 1.0) return [0, 0, fw, fh];
+  if (!st.zoom || !d?.detectado || (st.modo === "camara" && ahora - st.ultimaDet > 1.0)) return [0, 0, fw, fh];
   const [x, y, w, h] = d.caja, A = fw / fh;
   let bw = w * 2.1, bh = h * 2.1;                      // el producto ocupa ~la mitad de la vista
   if (bw / bh < A) bw = bh * A; else bh = bw / A;
@@ -424,9 +818,13 @@ function dibujar() {
   const t = tamCuadro(); if (!t) return;
   const [fw, fh, fuente, kv] = t;
   const lienzo = $("lienzo");
-  if (lienzo.dataset.prop !== `${fw}/${fh}`) { lienzo.style.aspectRatio = `${fw} / ${fh}`; lienzo.dataset.prop = `${fw}/${fh}`; }
+  if (lienzo.dataset.prop !== `${fw}/${fh}`) {
+    lienzo.style.aspectRatio = `${fw} / ${fh}`; lienzo.style.setProperty("--arn", (fw / fh).toFixed(4));
+    lienzo.dataset.prop = `${fw}/${fh}`;
+  }
   const dpr = window.devicePixelRatio || 1, rect = lienzo.getBoundingClientRect();
   const cw = Math.round(rect.width * dpr), ch = Math.round(rect.height * dpr);
+  if (!cw || !ch) return;
   if (vista.width !== cw || vista.height !== ch) { vista.width = cw; vista.height = ch; }
   const c = vista.getContext("2d");
 
@@ -435,7 +833,7 @@ function dibujar() {
   const [bx, by, bw, bh] = st.caja, k = cw / bw;
 
   c.setTransform(1, 0, 0, 1, 0, 0);
-  c.fillStyle = "#000"; c.fillRect(0, 0, cw, ch);
+  c.fillStyle = "#050807"; c.fillRect(0, 0, cw, ch);
   if (st.mascara && st.mascaraImg) c.drawImage(st.mascaraImg, bx, by, bw, bh, 0, 0, cw, ch);
   else c.drawImage(fuente, bx * kv, by * kv, bw * kv, bh * kv, 0, 0, cw, ch);
 
@@ -447,48 +845,39 @@ function dibujar() {
     const poli = (pts, cerrar = true) => {
       c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (cerrar) c.closePath();
     };
-    c.fillStyle = "rgba(255,0,0,.55)";
+    c.lineJoin = "round"; c.lineCap = "round";
+    c.fillStyle = COLORES.dano;
     d.danos.forEach(p => { poli(p); c.fill(); });
     if (st.discos && !st.mascara) {
-      c.strokeStyle = "#ffdc00"; c.lineWidth = g * 0.6;
+      c.strokeStyle = COLORES.discos; c.lineWidth = g * 0.55;
       d.discos.forEach(s => { poli(s, false); c.stroke(); });
-      c.strokeStyle = "#00ffff"; poli(d.eje, false); c.stroke();
+      c.strokeStyle = COLORES.eje; c.lineWidth = g * 0.7; poli(d.eje, false); c.stroke();
     }
-    c.strokeStyle = "#00ff00"; c.lineWidth = g; poli(d.contorno); c.stroke();
+    c.strokeStyle = COLORES.contorno; c.lineWidth = g; poli(d.contorno); c.stroke();
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
 
-  // minimapa con la vista completa cuando hay zoom
-  if (bw < fw * 0.95) {
-    const mw = cw * 0.24, mh = mw * fh / fw, mx = cw - mw - 10 * dpr, my = ch - mh - 10 * dpr;
-    c.globalAlpha = 0.9; c.drawImage(fuente, 0, 0, fw * kv, fh * kv, mx, my, mw, mh); c.globalAlpha = 1;
-    c.strokeStyle = "rgba(255,255,255,.8)"; c.lineWidth = dpr; c.strokeRect(mx, my, mw, mh);
-    c.strokeStyle = "#ffd15a"; c.lineWidth = 2 * dpr;
+  // minimapa con la vista completa cuando hay zoom (sobre el resumen inferior)
+  if (bw < fw * 0.95 && rect.width >= 420) {
+    const hud = $("hudRes"), abajo = (hud.hidden ? 12 : hud.offsetHeight + 4) * dpr;
+    const mw = cw * 0.2, mh = mw * fh / fw, mx = cw - mw - 12 * dpr, my = ch - mh - abajo;
+    c.globalAlpha = 0.92; c.drawImage(fuente, 0, 0, fw * kv, fh * kv, mx, my, mw, mh); c.globalAlpha = 1;
+    c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = dpr; c.strokeRect(mx, my, mw, mh);
+    c.strokeStyle = COLORES.discos; c.lineWidth = 2 * dpr;
     c.strokeRect(mx + bx / fw * mw, my + by / fh * mh, bw / fw * mw, bh / fh * mh);
-  }
-
-  // indicador de captura automática
-  if (st.autoCap && d?.detectado && st.modo === "camara") {
-    const txt = st.capturando ? "Capturando…" : st.capturada ? "✓ Capturado — ponga otro producto"
-              : st.progreso > 0.05 ? "Manténgalo quieto…" : "Producto detectado";
-    c.font = `600 ${14 * dpr}px system-ui, sans-serif`;
-    const tw = c.measureText(txt).width + 24 * dpr, th = 30 * dpr, x = 10 * dpr, y = 10 * dpr;
-    c.fillStyle = "rgba(0,0,0,.6)"; c.fillRect(x, y, tw, th);
-    if (!st.capturada && !st.capturando) { c.fillStyle = "#ffd15a"; c.fillRect(x, y + th - 4 * dpr, tw * st.progreso, 4 * dpr); }
-    c.fillStyle = st.capturada ? "#3ddc84" : "#fff"; c.fillText(txt, x + 12 * dpr, y + 20 * dpr);
   }
 }
 requestAnimationFrame(dibujar);
 
 // ---------------------------------------------------------------- acciones
 function hayImagen() {
-  if (!st.modo) { aviso("Primero inicie la cámara o suba una foto."); return false; }
+  if (!st.modo) { aviso("Primero inicie la cámara, suba una foto o pruebe un ejemplo."); return false; }
   return true;
 }
 
 async function capturar(automatica = false) {
   if (!hayImagen() || st.capturando) return;
-  st.capturando = true;
+  st.capturando = true; actualizarChip();
   if (!automatica) aviso("Generando lámina de cálculo…", 8000);
   try {
     const resp = await fetch("/api/reporte", { method: "POST", body: formulario(await cuadro()) });
@@ -503,25 +892,28 @@ async function capturar(automatica = false) {
     st.laminas.set(marca, url);
     if (st.laminas.size > 30) { const [vieja] = st.laminas.keys(); URL.revokeObjectURL(st.laminas.get(vieja)); st.laminas.delete(vieja); }
     if (r) { st.historial.push({ fecha: marca, ...r }); guardarHistorial(); }
-    $("ultima").style.display = "flex"; $("ultimaImg").src = url; $("ultima").dataset.fecha = marca;
-    $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³<br>
-      <span style="color:var(--tenue)">${automatica ? "Captura automática" : "Captura manual"} · toque para ver</span>` : "";
+    $("ultima").hidden = false; $("ultimaImg").src = url; $("ultima").dataset.fecha = marca;
+    $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³ · ${fmt(r.peso_g, 0)} g<br>
+      <span style="color:var(--faint)">${automatica ? "Captura automática" : "Captura manual"} · toque para ver la lámina</span>` : "";
     if (automatica) {
-      aviso(r ? `Captura automática: ${r.producto} · ${r.estado}` : "Captura automática guardada", 2500);
-      $("lienzo").classList.add("destello"); setTimeout(() => $("lienzo").classList.remove("destello"), 600);
+      aviso(r ? `Lámina guardada: ${r.producto} · ${r.estado}` : "Lámina guardada", 2500);
+      $("lienzo").classList.add("destello"); setTimeout(() => $("lienzo").classList.remove("destello"), 700);
     } else { verLamina(marca); aviso("Lámina lista.", 1500); }
-  } finally { st.capturando = false; }
+  } finally { st.capturando = false; actualizarChip(); }
 }
 
 function verLamina(fecha) {
   const url = st.laminas.get(fecha);
   if (!url) { aviso("La lámina de esta captura ya no está en memoria (solo se guardan los datos)."); return; }
+  const h = st.historial.find(x => x.fecha === fecha);
+  $("dlgTitulo").textContent = h ? `Lámina de cálculo · ${h.producto}` : "Lámina de cálculo";
   $("lamina").src = url; $("descargar").href = url; $("descargar").download = `reporte_${fecha}.png`;
   $("dlg").showModal();
 }
 
 async function calibrar() {
   if (!hayImagen()) return;
+  if (st.escalaFija) { aviso("Las fotos de ejemplo ya tienen escala conocida; calibre con la cámara."); return; }
   const resp = await fetch("/api/calibrar", { method: "POST", body: formulario(await cuadro()) });
   const d = await resp.json();
   if (!d.ok) { aviso(d.mensaje || d.error || "No se pudo calibrar."); return; }
@@ -540,17 +932,25 @@ async function alternarFondo() {
 }
 
 function marcarBotones() {
+  for (const [id, on] of [["btnDiscos", st.discos], ["btnMascara", st.mascara], ["btnZoom", st.zoom]]) {
+    $(id).classList.toggle("activo", on); $(id).setAttribute("aria-pressed", on);
+  }
   $("btnFondo").classList.toggle("activo", !!st.fondo);
-  $("btnDiscos").classList.toggle("activo", st.discos);
-  $("btnMascara").classList.toggle("activo", st.mascara);
-  $("btnZoom").classList.toggle("activo", st.zoom);
-  $("btnAuto").classList.toggle("activo", st.autoCap);
+  $("txtFondo").textContent = st.fondo ? "Fondo capturado (quitar)" : "Capturar fondo vacío";
+  $("detResumen").textContent = st.fondo ? "con fondo" : st.sens === 50 ? "automática" : `sensibilidad ${st.sens}`;
+  $("chkAuto").checked = st.autoCap;
 }
 
 function mostrarEscala() {
-  const e = $("escala");
-  e.textContent = `${st.px.toFixed(1)} px/cm` + (st.calibrado ? " (calibrada)" : " — SIN CALIBRAR: las medidas son aproximadas");
-  e.classList.toggle("sin", !st.calibrado);
+  const e = $("escala"), r = $("escalaResumen");
+  if (st.escalaFija) {
+    e.textContent = `Foto de ejemplo: escala conocida de ${st.escalaFija.toFixed(1)} px/cm.`;
+    r.textContent = "ejemplo"; r.className = "resumen ok"; return;
+  }
+  e.textContent = st.calibrado ? `${st.px.toFixed(1)} px/cm (calibrada). Si cambia la distancia de la cámara, vuelva a calibrar.`
+                               : `${st.px.toFixed(1)} px/cm aproximados: sin calibrar, las medidas en cm son solo estimaciones.`;
+  r.textContent = st.calibrado ? "calibrada" : "sin calibrar";
+  r.className = "resumen " + (st.calibrado ? "ok" : "alerta");
 }
 
 function elegirProducto(i) {
@@ -558,6 +958,11 @@ function elegirProducto(i) {
   st.producto = i; localStorage.producto = i; $("producto").value = i;
   if (i >= 0) $("ensenarProd").value = i;          // lo elegido a mano es lo que se suele enseñar
   reiniciarPresencia(); analizarUnaVez();
+}
+
+function alternarAuto(on = !st.autoCap) {
+  st.autoCap = on; st.capturada = null; marcarBotones(); actualizarChip();
+  aviso(on ? "Captura automática activada." : "Captura automática desactivada.");
 }
 
 // ---------------------------------------------------------------- enseñar al reconocedor
@@ -578,8 +983,9 @@ function mostrarConteo() {
   const c = {};
   st.ejemplos.forEach(e => { const n = e.nombre || nombre(e.producto); c[n] = (c[n] || 0) + 1; });
   const txt = Object.entries(c).map(([n, k]) => `${n} ${k}`).join(" · ");
-  $("conteo").innerHTML = txt ? `Ejemplos guardados: ${txt} <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
-                              : "Sin ejemplos: se reconoce solo con las reglas de cada ficha.";
+  $("ejResumen").textContent = st.ejemplos.length ? `${st.ejemplos.length} ejemplos` : "";
+  $("conteo").innerHTML = txt ? `Guardados: ${txt}. <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
+                              : "Sin ejemplos: se reconoce solo con las reglas de cada producto.";
   const b = $("btnOlvidarEj");
   if (b) b.onclick = () => { st.ejemplos = []; localStorage.removeItem("ejemplos"); st.votos = {}; mostrarConteo(); analizarUnaVez();
                              aviso("Ejemplos borrados."); };
@@ -588,11 +994,12 @@ function mostrarConteo() {
 // ---------------------------------------------------------------- historial
 function guardarHistorial() {
   localStorage.historial = JSON.stringify(st.historial);
+  $("nCapt").textContent = st.historial.length;
   $("tabla").innerHTML = st.historial.slice().reverse().map(h => `<tr class="${st.laminas.has(h.fecha) ? "ver" : ""}" data-fecha="${h.fecha}">
     <td>${h.fecha.slice(9, 11)}:${h.fecha.slice(11, 13)}</td><td>${h.producto}</td>
     <td>${fmt(h.area_cm2, 1)}</td><td>${fmt(h.volumen_cm3, 0)}</td><td>${fmt(h.peso_g, 0)}</td>
-    <td>${fmt(h.dano_pct, 1)}%</td><td style="color:${COLOR_ESTADO[h.estado] || "inherit"}">${h.estado}</td></tr>`).join("")
-    || `<tr><td colspan="7" style="text-align:center;color:var(--tenue)">Sin capturas todavía</td></tr>`;
+    <td><span class="pill" style="background:${COLOR_ESTADO[h.estado] || ""}">${h.estado}</span></td></tr>`).join("")
+    || `<tr><td colspan="6" class="vacia">Las láminas aparecerán aquí al capturar.</td></tr>`;
 }
 
 function descargarCsv() {
@@ -607,6 +1014,7 @@ function descargarCsv() {
 
 // ---------------------------------------------------------------- eventos
 $("btnCamara").onclick = () => st.stream ? detenerCamara() : iniciarCamara();
+$("btnCamara2").onclick = iniciarCamara;
 $("btnGirar").onclick = () => { st.facing = st.facing === "environment" ? "user" : "environment"; iniciarCamara(); };
 $("archivo").onchange = e => { if (e.target.files[0]) cargarFoto(e.target.files[0]); e.target.value = ""; };
 $("producto").onchange = e => elegirProducto(+e.target.value);
@@ -616,24 +1024,28 @@ $("btnFondo").onclick = alternarFondo;
 $("btnDiscos").onclick = () => { st.discos = !st.discos; marcarBotones(); };
 $("btnMascara").onclick = () => { st.mascara = !st.mascara; marcarBotones(); analizarUnaVez(); };
 $("btnZoom").onclick = () => { st.zoom = !st.zoom; marcarBotones(); };
-$("btnAuto").onclick = () => { st.autoCap = !st.autoCap; st.capturada = null; marcarBotones();
-                               aviso(st.autoCap ? "Captura automática activada." : "Captura automática desactivada."); };
+$("chkAuto").onchange = e => alternarAuto(e.target.checked);
 $("btnOlvidar").onclick = () => { localStorage.removeItem("px_por_cm"); st.px = PX_DEFECTO; st.calibrado = false; mostrarEscala(); analizarUnaVez(); };
 $("btnCsv").onclick = descargarCsv;
 $("btnBorrar").onclick = () => { st.historial = []; guardarHistorial(); };
-$("cerrar").onclick = () => $("dlg").close();
 $("ultima").onclick = () => verLamina($("ultima").dataset.fecha);
 $("tabla").onclick = e => { const tr = e.target.closest("tr.ver"); if (tr) verLamina(tr.dataset.fecha); };
 $("btnEnsenar").onclick = ensenar;
-$("sens").oninput =e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; analizarUnaVez(); };
+$("btnComo").onclick = () => $("dlgComo").showModal();
+$("sens").oninput = e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; marcarBotones(); analizarUnaVez(); };
+document.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = () => b.closest("dialog").close());
+document.querySelectorAll("dialog").forEach(dl => dl.addEventListener("click", e => { if (e.target === dl) dl.close(); }));
+$("ejemplos").insertAdjacentHTML("beforeend",
+  Object.entries(EJEMPLOS).map(([k, n]) => `<button type="button" data-ejemplo="${k}">${n}</button>`).join(""));
+$("ejemplos").onclick = e => { const b = e.target.closest("[data-ejemplo]"); if (b) cargarEjemplo(b.dataset.ejemplo); };
 
 document.addEventListener("keydown", e => {
-  if (e.target.matches("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey || $("dlg").open) return;
+  if (e.target.matches("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey || document.querySelector("dialog[open]")) return;
   const k = e.key.toLowerCase();
   if (k === "0") elegirProducto(-1);
   else if (k >= "1" && k <= "9") elegirProducto(+k - 1);
   else if (k === "c" || k === " ") { e.preventDefault(); capturar(false); }
-  else if (k === "a") $("btnAuto").click();
+  else if (k === "a") alternarAuto();
   else if (k === "z") $("btnZoom").click();
   else if (k === "e") ensenar();
   else if (k === "k") calibrar();
@@ -647,7 +1059,7 @@ document.addEventListener("keydown", e => {
   st.productos = await (await fetch("/api/productos")).json();
   const grupos = lista => ["Fruta", "Verdura", "Otro"].map(cat => {
     const ps = st.productos.filter(p => (p.categoria || "Otro") === cat);
-    return ps.length ? `<optgroup label="${{Fruta: "Frutas", Verdura: "Verduras", Otro: "Otro"}[cat]}">${ps.map(lista).join("")}</optgroup>` : "";
+    return ps.length ? `<optgroup label="${{ Fruta: "Frutas", Verdura: "Verduras", Otro: "Otro" }[cat]}">${ps.map(lista).join("")}</optgroup>` : "";
   }).join("");
   $("producto").innerHTML = `<option value="-1">Automático (reconocer)</option>` +
     grupos(p => `<option value="${p.id}">${p.id < 9 ? (p.id + 1) + ". " : ""}${p.nombre}</option>`);
@@ -657,6 +1069,9 @@ document.addEventListener("keydown", e => {
   if (st.producto >= 0) $("ensenarProd").value = st.producto;
   st.ejemplos = st.ejemplos.filter(e => e.producto < st.productos.length);
   mostrarConteo();
+  const q = new URLSearchParams(location.search).get("ejemplo");      // p. ej. /?ejemplo=banano
+  if (q && EJEMPLOS[q]) cargarEjemplo(q);
+  if (new URLSearchParams(location.search).has("como")) $("dlgComo").showModal();   // enlace directo a la explicación
 })();
 </script>
 </body>

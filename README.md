@@ -43,6 +43,8 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - Railway: *New Project → Deploy from GitHub repo* → elegir este repositorio → *Settings → Networking → Generate Domain*. La configuración ya está en `railway.json` (usa `requirements.txt` con OpenCV sin pantalla).
 - La cámara del navegador solo funciona con HTTPS (Railway lo da) o en `localhost`.
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
+- **Probar sin cámara**: la pantalla inicial tiene fotos sintéticas de ejemplo con escala conocida (30 px/cm). También hay enlaces directos para compartir: `/?ejemplo=banano` (o `naranja`, `manzana-verde`, `tomate`, `zanahoria`) y `/?como`, que abre la explicación de las fórmulas.
+- En el celular, el producto, su estado y el área, el volumen y el peso se muestran **sobre la cámara**, para no tener que bajar mientras se apunta; la barra inferior tiene Cámara, Foto, Capturar, Cambiar y Auto.
 
 ## Productos curvos: el eje curvo (banano)
 El método de discos clásico gira la silueta alrededor de un eje **recto**. Un banano es curvo, y con eje recto su volumen sale mal (los discos verticales cortan el banano en diagonal y lo "engordan"). Por eso, para productos alargados y curvos:
