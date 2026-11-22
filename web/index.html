@@ -45,6 +45,9 @@
   select { width: 100%; background: var(--boton); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
            padding: 8px 10px; font: inherit; }
   .reconocido { margin-top: 6px; font-size: .88rem; color: var(--tenue); min-height: 1.3em; }
+  .porque { font-size: .8rem; color: var(--tenue); opacity: .85; min-height: 1.2em; }
+  .ensenar { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .conteo { font-size: .82rem; color: var(--tenue); margin-top: 6px; }
   .estado { margin-top: 12px; border-radius: 9px; padding: 12px 14px; font-size: 1.35rem; font-weight: 700; letter-spacing: .02em;
             background: #2a2f38; color: #fff; transition: background .2s; }
   .estado small { display: block; font-size: .8rem; font-weight: 400; opacity: .85; letter-spacing: 0; }
@@ -109,14 +112,15 @@
     <canvas id="foto" class="oculto"></canvas>
     <p class="ayuda">Contorno en verde · manchas (daño) en rojo · discos en amarillo · eje de revolución en celeste.
       Con la captura automática, deje la fruta quieta ~1 s y se guarda sola.<br>
-      Teclas: <kbd>0</kbd> automático · <kbd>1-6</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
-      <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
+      Teclas: <kbd>0</kbd> automático · <kbd>1-7</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
+      <kbd>E</kbd> enseñar · <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
   </section>
 
   <aside class="panel">
     <h2>Producto</h2>
     <select id="producto"></select>
     <div id="reconocido" class="reconocido"></div>
+    <div id="porque" class="porque"></div>
     <div id="estado" class="estado">—<small>Esperando imagen</small></div>
     <dl>
       <dt>Área <span class="f">∫(f−g)dx</span></dt><dd id="v_area">—</dd>
@@ -146,6 +150,15 @@
     <label class="rango">Sensibilidad <span id="t_sens">50</span><input id="sens" type="range" min="0" max="100" value="50"></label>
     <p class="nota">Súbala si no detecta frutas pálidas; bájela si toma sombras u otros objetos.
       Para productos muy parecidos al fondo use <b>Fondo</b>: con la escena vacía púlselo y luego ponga el producto.</p>
+
+    <h2>Enseñar al reconocedor</h2>
+    <p class="nota" style="margin:0 0 8px">Si confunde productos (p. ej. manzana con limón), ponga una fruta, elija qué es
+      y pulse <b>Guardar ejemplo</b>. Con 2-3 ejemplos de cada una aprende sus frutas y su luz.</p>
+    <div class="ensenar">
+      <select id="ensenarProd"></select>
+      <button id="btnEnsenar">Guardar ejemplo <kbd>E</kbd></button>
+    </div>
+    <div id="conteo" class="conteo"></div>
 
     <h2>Capturas</h2>
     <div id="ultima" class="ultima"><img id="ultimaImg" alt="Última lámina capturada"><div id="ultimaTxt"></div></div>
@@ -185,6 +198,7 @@ const st = {
   det: null, mascaraImg: null, ultimaDet: 0, caja: null,
   votos: {}, muestras: [], progreso: 0, capturada: null, capturando: false,
   historial: JSON.parse(localStorage.historial || "[]"), laminas: new Map(),
+  ejemplos: JSON.parse(localStorage.ejemplos || "[]"),
 };
 const video = $("video"), foto = $("foto"), vista = $("vista"), tmp = document.createElement("canvas");
 
@@ -269,6 +283,8 @@ function formulario(blob, extra = {}) {
   if (st.fondo) fd.append("fondo", st.fondo, "fondo.jpg");
   fd.append("producto", productoEnviar()); fd.append("auto", st.producto < 0 ? 1 : 0);
   fd.append("px_por_cm", st.px); fd.append("sensibilidad", st.sens);
+  fd.append("calibrado", st.calibrado ? 1 : 0);                       // con calibración el tamaño ayuda a reconocer
+  if (st.ejemplos.length) fd.append("ejemplos", JSON.stringify(st.ejemplos));
   for (const [k, v] of Object.entries(extra)) fd.append(k, v);
   return fd;
 }
@@ -355,7 +371,7 @@ function mostrar(d) {
   const e = $("estado");
   if (!d.detectado) {
     e.style.background = ""; e.innerHTML = "—<small>Buscando producto…</small>";
-    $("reconocido").textContent = "";
+    $("reconocido").textContent = ""; $("porque").textContent = "";
     ["v_area", "v_vol", "v_peso", "v_dim", "v_dano", "v_mad", "v_cal"].forEach(id => $(id).textContent = "—");
     return;
   }
@@ -366,6 +382,13 @@ function mostrar(d) {
     $("reconocido").textContent = id >= 0 ? `Reconocido automáticamente: ${nombre(id)} (${Math.round(v * 100)} %)`
                                           : "Reconociendo producto…";
   } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere: ${nombre(d.reconocido_id)}`;
+  // por qué: candidatos, método y rasgos medidos (para revisar las confusiones)
+  const rec = d.reconocimiento || {}, ra = d.rasgos || {};
+  const cand = (rec.candidatos || []).map(([n, v]) => `${n} ${Math.round(v * 100)} %`).join(" · ");
+  const forma = ra.alarg == null ? "" : ` · forma ${ra.alarg.toFixed(2)} (${ra.alarg < 1.12 ? "redonda" : "alargada"})`;
+  const tam = st.calibrado && ra.diam_cm ? ` · Ø ${ra.diam_cm.toFixed(1)} cm` : "";
+  $("porque").textContent = `Por qué: ${cand} — ${rec.metodo === "ejemplos" ? "por sus ejemplos" : "por reglas"}` +
+    `${rec.motivo ? " (" + rec.motivo + ")" : ""}${forma}${tam}`;
   e.style.background = COLOR_ESTADO[r.estado] || "";
   e.innerHTML = `${r.estado}<small>${r.producto}</small>`;
   $("v_area").textContent = fmt(s.area_cm2, 1) + " cm²";
@@ -529,7 +552,33 @@ function mostrarEscala() {
 function elegirProducto(i) {
   if (i < -1 || i >= st.productos.length) return;
   st.producto = i; localStorage.producto = i; $("producto").value = i;
+  if (i >= 0) $("ensenarProd").value = i;          // lo elegido a mano es lo que se suele enseñar
   reiniciarPresencia(); analizarUnaVez();
+}
+
+// ---------------------------------------------------------------- enseñar al reconocedor
+function ensenar() {
+  const d = st.det, viejo = st.modo === "camara" && performance.now() / 1000 - st.ultimaDet > 1.0;
+  if (!d?.detectado || !d.rasgos || viejo) { aviso("Primero ponga el producto frente a la cámara (o suba una foto)."); return; }
+  const id = +$("ensenarProd").value;
+  st.ejemplos.push({ producto: id, rasgos: d.rasgos });
+  if (st.ejemplos.length > 150) st.ejemplos.shift();
+  localStorage.ejemplos = JSON.stringify(st.ejemplos);
+  mostrarConteo(); st.votos = {}; analizarUnaVez();
+  const n = st.ejemplos.filter(e => e.producto === id).length;
+  aviso(`Ejemplo guardado: ${nombre(id)} (${n} ${n === 1 ? "ejemplo" : "ejemplos"}).` +
+        (n < 2 ? " Conviene guardar 2-3 por producto, en distintas posiciones." : ""), 4000);
+}
+
+function mostrarConteo() {
+  const c = {};
+  st.ejemplos.forEach(e => c[e.producto] = (c[e.producto] || 0) + 1);
+  const txt = Object.entries(c).map(([id, n]) => `${nombre(+id)} ${n}`).join(" · ");
+  $("conteo").innerHTML = txt ? `Ejemplos guardados: ${txt} <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
+                              : "Sin ejemplos: se reconoce solo con las reglas de cada ficha.";
+  const b = $("btnOlvidarEj");
+  if (b) b.onclick = () => { st.ejemplos = []; localStorage.removeItem("ejemplos"); st.votos = {}; mostrarConteo(); analizarUnaVez();
+                             aviso("Ejemplos borrados."); };
 }
 
 // ---------------------------------------------------------------- historial
@@ -571,7 +620,8 @@ $("btnBorrar").onclick = () => { st.historial = []; guardarHistorial(); };
 $("cerrar").onclick = () => $("dlg").close();
 $("ultima").onclick = () => verLamina($("ultima").dataset.fecha);
 $("tabla").onclick = e => { const tr = e.target.closest("tr.ver"); if (tr) verLamina(tr.dataset.fecha); };
-$("sens").oninput = e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; analizarUnaVez(); };
+$("btnEnsenar").onclick = ensenar;
+$("sens").oninput =e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; analizarUnaVez(); };
 
 document.addEventListener("keydown", e => {
   if (e.target.matches("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey || $("dlg").open) return;
@@ -581,6 +631,7 @@ document.addEventListener("keydown", e => {
   else if (k === "c" || k === " ") { e.preventDefault(); capturar(false); }
   else if (k === "a") $("btnAuto").click();
   else if (k === "z") $("btnZoom").click();
+  else if (k === "e") ensenar();
   else if (k === "k") calibrar();
   else if (k === "b") alternarFondo();
   else if (k === "d") $("btnDiscos").click();
@@ -594,6 +645,10 @@ document.addEventListener("keydown", e => {
     st.productos.map(p => `<option value="${p.id}">${p.id + 1}. ${p.nombre}</option>`).join("");
   if (st.producto >= st.productos.length || st.producto < -1 || Number.isNaN(st.producto)) st.producto = -1;
   $("producto").value = st.producto;
+  $("ensenarProd").innerHTML = st.productos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join("");
+  if (st.producto >= 0) $("ensenarProd").value = st.producto;
+  st.ejemplos = st.ejemplos.filter(e => e.producto < st.productos.length);
+  mostrarConteo();
 })();
 </script>
 </body>

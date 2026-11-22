@@ -12,3 +12,6 @@ calibracion.json
 capturas/foto_*
 capturas/reporte_*
 capturas/resultados.csv
+
+# Ejemplos enseñados al reconocedor (propios de cada equipo)
+entrenamiento.json

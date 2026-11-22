@@ -4,7 +4,7 @@ INSPECCIÓN EN VIVO CON LA CÁMARA DEL PC
 Apunte la cámara al producto: se detecta solo, en cualquier parte de la
 imagen y sobre cualquier fondo liso o de un color distinto al producto
 (mesa, mantel, hoja...). El programa:
-  - reconoce qué producto es (o use 1-6 para elegirlo a mano),
+  - reconoce qué producto es (o use 1-7 para elegirlo a mano),
   - hace zoom sobre él,
   - calcula en tiempo real área (∫(f−g)dx), volumen (π∫r²dx), peso, % de daño,
     madurez y estado,
@@ -12,7 +12,9 @@ imagen y sobre cualquier fondo liso o de un color distinto al producto
 
 Teclas:
   0          reconocer el producto automáticamente (predeterminado)
-  1-6        elegir el producto a mano (ver productos.py)
+  1-7        elegir el producto a mano (ver productos.py)
+  E          enseñar: guarda la fruta actual como ejemplo del producto elegido con 1-7
+             (si confunde productos, 2-3 ejemplos de cada uno lo corrigen; se guardan en entrenamiento.json)
   A          activar/desactivar la captura automática
   Z          activar/desactivar el zoom al producto
   C o ESPACIO  capturar a mano: foto + lámina de cálculo + fila en resultados.csv
@@ -39,6 +41,7 @@ from productos import PRODUCTOS
 
 CARPETA = os.path.dirname(os.path.abspath(__file__))
 ARCHIVO_CAL = os.path.join(CARPETA, "calibracion.json")
+ARCHIVO_EJ = os.path.join(CARPETA, "entrenamiento.json")
 CARPETA_CAPT = os.path.join(CARPETA, "capturas")
 INDICE_CAMARA = int(sys.argv[1]) if len(sys.argv) > 1 else 0
 REFERENCIA_CM = 8.56          # lado largo de una tarjeta tipo carnet o crédito
@@ -79,6 +82,19 @@ def cargar_calibracion():
             return float(json.load(fh)["px_por_cm"]), True
     except (OSError, ValueError, KeyError):
         return PX_POR_CM_DEFECTO, False
+
+
+def cargar_ejemplos():
+    try:
+        with open(ARCHIVO_EJ, encoding="utf-8") as fh:
+            return [e for e in json.load(fh) if 0 <= e["producto"] < len(PRODUCTOS)]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+
+
+def guardar_ejemplos(ejemplos):
+    with open(ARCHIVO_EJ, "w", encoding="utf-8") as fh:
+        json.dump(ejemplos, fh, ensure_ascii=False)
 
 
 def guardar_calibracion(px_por_cm):
@@ -196,7 +212,12 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
         titulo = PRODUCTOS[i].nombre if i is not None else ("Reconociendo…" if r is not None else "—")
         sub = f"reconocido automáticamente ({v * 100:.0f} %)" if i is not None else "modo automático"
     textos = [(titulo, (18, 12), 28, amarillo), (sub, (18, 46), 16, gris)]
-    y = 82
+    if r is not None:            # por qué: candidatos y método (para revisar confusiones)
+        rec = r["reconocimiento"]
+        cand = " · ".join(f"{n} {v * 100:.0f}%" for n, v in rec["candidatos"][:2])
+        metodo = "sus ejemplos" if rec["metodo"] == "ejemplos" else "reglas"
+        textos.append((f"Por qué ({metodo}): {cand}", (18, 66), 14, gris))
+    y = 90
     if r is None:
         textos.append(("Buscando producto…", (18, y), 19, gris))
     else:
@@ -222,7 +243,7 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
                    (18, y + 24), 17, gris))
     if fondo_activo:
         textos.append(("Modo fondo capturado (B para quitar)", (18, y + 48), 17, gris))
-    ayuda = ["0 automático · 1-6 elegir producto", "C / Espacio  capturar a mano", "K  calibrar con tarjeta",
+    ayuda = ["0 automático · 1-7 elegir · E enseñar", "C / Espacio  capturar a mano", "K  calibrar con tarjeta",
              "B  fondo vacío   D  discos   M  máscara", "Q / Esc  salir"]
     for i, t in enumerate(ayuda):
         textos.append((t, (18, H - 26 - (len(ayuda) - i) * 24), 17, gris))
@@ -281,6 +302,7 @@ def main():
     ver_discos, ver_mascara, auto, zoom = True, False, True, True
     suav, caja, ultimo_r = None, None, None
     seg = Seguimiento()
+    ejemplos = cargar_ejemplos()
 
     cv2.namedWindow(VENTANA, cv2.WINDOW_NORMAL)
     cv2.createTrackbar("Sensibilidad", VENTANA, 50, 100, lambda v: None)
@@ -302,7 +324,7 @@ def main():
         estable, _ = seg.producto_estable()
         prod = producto_fijo if producto_fijo is not None else (PRODUCTOS[estable] if estable is not None else None)
         try:
-            r = vision.analizar(frame, prod, px_por_cm, fondo, sens)
+            r = vision.analizar(frame, prod, px_por_cm, fondo, sens, calibrado, ejemplos)
         except cv2.error:
             r = None
         if r is not None:
@@ -348,6 +370,16 @@ def main():
         elif tecla in (ord("a"), ord("A")):
             auto = not auto
             seg.capturada = None
+        elif tecla in (ord("e"), ord("E")):
+            if r is None:
+                print("Enseñar: no hay producto a la vista.")
+            elif producto_fijo is None:
+                print("Enseñar: primero diga qué producto es con las teclas 1-7, y luego pulse E.")
+            else:
+                ejemplos.append({"producto": PRODUCTOS.index(producto_fijo), "rasgos": r["rasgos"]})
+                guardar_ejemplos(ejemplos)
+                n = sum(e["producto"] == PRODUCTOS.index(producto_fijo) for e in ejemplos)
+                print(f"Ejemplo guardado: {producto_fijo.nombre} ({n}). Para volver al modo automático pulse 0.")
         elif tecla in (ord("z"), ord("Z")):
             zoom = not zoom
         elif tecla in (ord("d"), ord("D")):

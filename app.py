@@ -52,12 +52,36 @@ def parametros():
         "producto": PRODUCTOS[i] if 0 <= i < len(PRODUCTOS) else None,
         "px_por_cm": max(float(f.get("px_por_cm", 12.0)), 0.1),
         "sensibilidad": int(f.get("sensibilidad", 50)),
+        "calibrado": f.get("calibrado") == "1",
+        "ejemplos": leer_ejemplos(f.get("ejemplos")),
     }
+
+
+def leer_ejemplos(texto, maximo=300):
+    """Ejemplos enseñados por el usuario (vienen del navegador). Se descartan los mal formados."""
+    if not texto:
+        return None
+    try:
+        datos = json.loads(texto)
+    except ValueError:
+        return None
+    validos = []
+    for e in datos[:maximo] if isinstance(datos, list) else []:
+        try:
+            i, r = int(e["producto"]), e["rasgos"]
+            rasgos = {"hist": [float(v) for v in r["hist"]], "calibrado": bool(r.get("calibrado")),
+                      **{k: float(r[k]) for k in ("palidez", "sat", "val", "alarg", "diam_cm")}}
+        except (KeyError, TypeError, ValueError):
+            continue
+        if 0 <= i < len(PRODUCTOS) and len(rasgos["hist"]) == 18:
+            validos.append({"producto": i, "rasgos": rasgos})
+    return validos or None
 
 
 def analizar(p):
     try:
-        r = vision.analizar(p["frame"], p["producto"], p["px_por_cm"], p["fondo"], p["sensibilidad"])
+        r = vision.analizar(p["frame"], p["producto"], p["px_por_cm"], p["fondo"], p["sensibilidad"],
+                            p["calibrado"], p["ejemplos"])
     except cv2.error:
         return None
     if r is not None and request.form.get("auto") == "1":
@@ -130,6 +154,7 @@ def api_analizar():
             "discos": discos, "eje": eje,
             "caja": list(cv2.boundingRect(r["contorno"])),          # para el zoom al producto
             "reconocido_id": r["reconocido_id"], "reconocimiento": r["reconocimiento"],
+            "rasgos": r["rasgos"],                                  # la página los guarda al "Enseñar"
         })
     return jsonify(salida)
 

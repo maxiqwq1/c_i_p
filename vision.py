@@ -224,43 +224,145 @@ def detectar_danos(frame, mascara, producto):
     return dano, interior, hsv
 
 
-def reconocer(hsv, mascara, alargamiento):
+# ---------------------------------------------------------------- reconocimiento
+I_GENERICO = len(PRODUCTOS) - 1
+UMBRAL_EJEMPLO = 0.5        # distancia máxima para aceptar el ejemplo enseñado más parecido
+
+
+def balance_blancos(frame, mascara):
     """
-    Reconoce el producto comparando la silueta con el perfil de cada ficha:
-      color  = fracción de la piel con tonos típicos del producto (ponderada)
-      forma  = qué tan cerca está largo/diámetro del rango del producto
-      viveza = saturación mediana dentro del rango del producto
-    puntaje = color × forma × viveza (0-1). Devuelve (índice, {nombre: puntaje}).
-    Si ningún perfil supera 0.35, o el producto es pálido, se usa "Genérico".
+    Corrige el tinte de la luz (amarilla, azulada) usando el fondo que rodea al producto,
+    pero SOLO si ese fondo es claro, neutro y uniforme (hoja, pared, mesa blanca).
+    Así una manzana roja bajo luz cálida no parece naranja. Sobre madera o un mantel
+    de color no se corrige nada (no se sabe cuál es el "blanco").
+    """
+    area = cv2.countNonZero(mascara)
+    r = max(3, int(0.15 * np.sqrt(area)))
+    cerca_ = cv2.dilate(mascara, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1,) * 2))
+    lejos = cv2.dilate(mascara, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (6 * r + 1,) * 2))
+    anillo = (lejos > 0) & (cerca_ == 0)
+    if anillo.sum() < 200:
+        return frame
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)[anillo].astype(np.float32)
+    L, a, b = np.median(lab, axis=0)
+    croma = np.hypot(a - 128, b - 128)
+    uniforme = lab[:, 1].std() < 8 and lab[:, 2].std() < 8
+    # hoja/pared bajo luz con tinte: muy clara (L alto) aunque se vea amarillenta o azulada.
+    # Una madera clara tiene el mismo tinte pero es bastante más oscura, y no se corrige.
+    blanco_tenido = L >= 200 and croma <= 40
+    gris_neutro = L >= 90 and croma <= 20          # mesa gris, pared, cartulina
+    if not uniforme or not (blanco_tenido or gris_neutro):
+        return frame
+    bgr = np.median(frame[anillo].astype(np.float32), axis=0)
+    ganancia = np.clip(bgr.mean() / np.maximum(bgr, 1), 0.75, 1.33)
+    return np.clip(frame.astype(np.float32) * ganancia, 0, 255).astype(np.uint8)
+
+
+def calcular_rasgos(hsv, mascara, med, calibrado):
+    """
+    Rasgos que describen al producto (los usa el reconocimiento y se guardan como ejemplos):
+      hist     histograma de tonos de la piel (18 grupos de 10 unidades de hue)
+      palidez  fracción de piel casi sin color (papa, cebolla, ajo)
+      sat/val  saturación y brillo medianos (0-255)
+      alarg    eje mayor / eje menor de la elipse equivalente (momentos de segundo orden)
+      diam_cm  diámetro (solo es fiable si la cámara está calibrada)
     """
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     interior = cv2.erode(mascara, k, iterations=2) > 0
-    S = hsv[..., 1][interior]
-    V = hsv[..., 2][interior]
-    util = (S > 50) & (V > 40)
-    i_generico = len(PRODUCTOS) - 1
-    if S.size == 0 or util.mean() < 0.3:
-        return i_generico, {}
-    tonos = hsv[..., 0][interior][util].astype(int)
-    s_med = float(np.median(S[util]))
+    if not interior.any():
+        interior = mascara > 0
+    H, S, V = (hsv[..., i][interior] for i in range(3))
+    util = (S > 45) & (V > 40)
+    hist180 = np.bincount(H[util], minlength=180)[:180] / max(1, int(util.sum()))
+    m = cv2.moments(mascara, binaryImage=True)
+    mu20, mu02, mu11 = m["mu20"], m["mu02"], m["mu11"]
+    raiz = np.sqrt(((mu20 - mu02) / 2) ** 2 + mu11 ** 2)
+    l1, l2 = (mu20 + mu02) / 2 + raiz, (mu20 + mu02) / 2 - raiz
+    return {
+        "hist": [round(float(v), 4) for v in hist180.reshape(18, 10).sum(axis=1)],
+        "palidez": round(float(1 - util.mean()), 3),
+        "sat": round(float(np.median(S[util])) if util.any() else float(np.median(S)), 1),
+        "val": round(float(np.median(V)), 1),
+        "alarg": round(float(np.sqrt(l1 / max(l2, 1e-9))), 3),
+        "diam_cm": round(float(med["diametro_cm"]), 2),
+        "calibrado": bool(calibrado),
+        "_hist180": hist180,
+    }
 
-    def cerca(v, rango, escala):
-        lo, hi = rango
-        d = max(lo - v, 0, v - hi)
-        return float(np.exp(-(d / escala) ** 2))
 
+def _cerca(v, rango, escala):
+    """1 dentro del rango; cae suavemente (gaussiana) al alejarse."""
+    lo, hi = rango
+    d = max(lo - v, 0, v - hi)
+    return float(np.exp(-(d / escala) ** 2))
+
+
+def _puntajes_reglas(rasgos):
+    """puntaje = color × forma × viveza × tamaño  (cada factor entre 0 y 1)."""
+    h = rasgos["_hist180"]
     puntajes = {}
     for i, p in enumerate(PRODUCTOS):
-        if not p.colores:
-            continue
-        peso = np.zeros(180)
-        for h0, h1, w in p.colores:
-            peso[h0:h1 + 1] = np.maximum(peso[h0:h1 + 1], w)
-        color = float(peso[tonos].mean())
-        puntajes[i] = color * cerca(alargamiento, p.alargamiento, 0.12) * cerca(s_med, p.saturacion, 35)
-    mejor = max(puntajes, key=puntajes.get)
-    nombres = {PRODUCTOS[i].nombre: round(v, 3) for i, v in puntajes.items()}
-    return (mejor if puntajes[mejor] >= 0.35 else i_generico), nombres
+        perfiles = p.variantes or ([{}] if p.colores else [])
+        for v in perfiles:
+            peso = np.zeros(180)
+            for h0, h1, w in v.get("colores", p.colores):
+                peso[h0:h1 + 1] = np.maximum(peso[h0:h1 + 1], w)
+            color = float((h * peso).sum())
+            forma = _cerca(rasgos["alarg"], v.get("alargamiento", p.alargamiento), 0.05)
+            viveza = _cerca(rasgos["sat"], v.get("saturacion", p.saturacion), 35)
+            tam = _cerca(rasgos["diam_cm"], v.get("diametro", p.diametro), 0.7) if rasgos["calibrado"] else 1.0
+            puntajes[i] = max(puntajes.get(i, 0.0), color * forma * viveza * tam)
+    return puntajes
+
+
+def _suavizar_hist(h):
+    h = np.asarray(h, float)
+    h = 0.5 * h + 0.25 * np.roll(h, 1) + 0.25 * np.roll(h, -1)      # el tono es circular (rojo = 0 = 179)
+    return h / max(h.sum(), 1e-9)
+
+
+def distancia_rasgos(a, b):
+    """Qué tan distintos son dos productos (0 = idénticos). Se usa con los ejemplos enseñados."""
+    ha, hb = _suavizar_hist(a["hist"]), _suavizar_hist(b["hist"])
+    d = np.sqrt(max(0.0, 1 - float(np.sqrt(ha * hb).sum())))           # distancia de Hellinger
+    d += abs(a["sat"] - b["sat"]) / 255 + 0.5 * abs(a["val"] - b["val"]) / 255
+    d += 2.0 * abs(a["alarg"] - b["alarg"]) + abs(a["palidez"] - b["palidez"])
+    if a.get("calibrado") and b.get("calibrado") and a["diam_cm"] > 0 and b["diam_cm"] > 0:
+        d += abs(np.log(a["diam_cm"] / b["diam_cm"]))
+    return float(d)
+
+
+def reconocer(rasgos, ejemplos=None):
+    """
+    Decide qué producto es.
+      1) Si hay EJEMPLOS enseñados y alguno se parece lo suficiente (vecino más cercano),
+         gana ese: aprende las frutas y la luz reales del usuario.
+      2) Si no, REGLAS: el perfil de cada ficha (productos.py).
+      3) Si nada coincide o el producto es pálido: "Genérico".
+    Devuelve (índice, info) con el método usado y los 3 mejores candidatos (para explicar la decisión).
+    """
+    if ejemplos:
+        mejor_por_producto = {}
+        for e in ejemplos:
+            i = e["producto"]
+            d = distancia_rasgos(rasgos, e["rasgos"])
+            if i not in mejor_por_producto or d < mejor_por_producto[i]:
+                mejor_por_producto[i] = d
+        orden = sorted(mejor_por_producto.items(), key=lambda kv: kv[1])
+        if orden and orden[0][1] < UMBRAL_EJEMPLO:
+            cand = [(PRODUCTOS[i].nombre, round(max(0.0, 1 - d / UMBRAL_EJEMPLO), 2)) for i, d in orden[:3]]
+            return orden[0][0], {"metodo": "ejemplos", "candidatos": cand, "distancia": round(orden[0][1], 3)}
+
+    if rasgos["palidez"] > 0.7:
+        return I_GENERICO, {"metodo": "reglas", "candidatos": [("Genérico", 1.0)], "motivo": "producto pálido"}
+    puntajes = _puntajes_reglas(rasgos)
+    total = sum(puntajes.values()) + 0.05
+    orden = sorted(puntajes.items(), key=lambda kv: kv[1], reverse=True)
+    cand = [(PRODUCTOS[i].nombre, round(v / total, 2)) for i, v in orden[:3]]
+    mejor, valor = orden[0]
+    if valor < 0.25:
+        return I_GENERICO, {"metodo": "reglas", "candidatos": cand, "motivo": "ningún perfil coincide"}
+    return mejor, {"metodo": "reglas", "candidatos": cand}
 
 
 def madurez(hsv, interior, dano, producto):
@@ -295,10 +397,12 @@ def clasificar(producto, dano_pct, madurez_pct, diametro_cm):
 
 
 # ---------------------------------------------------------------- proceso completo
-def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50):
+def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50, calibrado=False, ejemplos=None):
     """
     Proceso completo sobre un cuadro de la cámara.
-    producto: una ficha de PRODUCTOS, o None para reconocerlo automáticamente.
+    producto:  una ficha de PRODUCTOS, o None para reconocerlo automáticamente.
+    calibrado: True si px_por_cm viene de una calibración real (entonces el tamaño ayuda a reconocer).
+    ejemplos:  [{"producto": índice, "rasgos": {...}}] enseñados por el usuario (opcional).
     """
     mascara, contorno = segmentar(frame, fondo, sensibilidad)
     if mascara is None:
@@ -308,14 +412,16 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50):
     if med is None:
         return None
 
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    alarg = med["largo_cm"] / max(med["diametro_cm"], 1e-9)
-    i_rec, puntajes = reconocer(hsv, mascara, alarg)
+    color = balance_blancos(frame, mascara)          # colores sin el tinte de la luz
+    hsv = cv2.cvtColor(color, cv2.COLOR_BGR2HSV)
+    rasgos = calcular_rasgos(hsv, mascara, med, calibrado)
+    i_rec, info = reconocer(rasgos, ejemplos)
+    rasgos.pop("_hist180")
     automatico = producto is None
     if automatico:
         producto = PRODUCTOS[i_rec]
 
-    dano, interior, hsv = detectar_danos(frame, mascara, producto)
+    dano, interior, hsv = detectar_danos(color, mascara, producto)
     px_producto = cv2.countNonZero(mascara)
     px_dano = cv2.countNonZero(dano)
     dano_pct = 100.0 * px_dano / px_producto
@@ -330,6 +436,6 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50):
         "peso_g": med["volumen_cm3"] * producto.densidad,
         "estado": estado, "calibre": calibre, "producto": producto.nombre,
         "producto_id": PRODUCTOS.index(producto), "automatico": automatico,
-        "reconocido_id": i_rec, "reconocimiento": puntajes, "alargamiento": alarg,
+        "reconocido_id": i_rec, "reconocimiento": info, "rasgos": rasgos,
     })
     return med

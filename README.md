@@ -15,7 +15,7 @@ Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y a
 
 Todo es **automático**:
 - **Detección en cualquier lugar**: no hace falta recuadro guía ni hoja blanca. El programa aprende los colores del fondo a partir del borde de la imagen y elige la región que más parece un producto (tamaño razonable, forma compacta, que no toque el borde). Ignora sombras, lápices y objetos cortados.
-- **Reconocimiento del producto** por color, forma (largo/diámetro) y viveza del color, con votación entre cuadros para que no salte. Si ningún perfil coincide, usa *Genérico*. Se puede elegir a mano.
+- **Reconocimiento del producto** (ver abajo), con votación entre cuadros para que no salte. Si ningún perfil coincide, usa *Genérico*. Se puede elegir a mano.
 - **Captura automática**: cuando el producto se queda quieto ~1 s se guarda la captura y la lámina; vuelve a capturar al poner otro producto.
 - **Zoom al producto**: la vista se acerca a la fruta (con un minimapa de la vista completa) y la foto de la lámina también.
 
@@ -36,6 +36,17 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - La cámara del navegador solo funciona con HTTPS (Railway lo da) o en `localhost`.
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
 
+## Cómo reconoce el producto
+1. **Corrige el color de la luz** (balance de blancos) si el fondo alrededor del producto es claro y neutro (hoja, pared, mesa gris): así una manzana roja con luz amarilla no parece naranja.
+2. **Mide rasgos**: histograma de tonos de la piel, saturación, brillo, **alargamiento** (eje mayor/eje menor de la elipse de momentos) y **diámetro en cm**.
+3. **Ejemplos enseñados** (si hay): si la fruta se parece lo suficiente a un ejemplo guardado, gana ese producto (vecino más cercano).
+4. **Reglas** de cada ficha (`productos.py`): puntaje = color × forma × viveza × tamaño. Una ficha puede tener **variantes** (p. ej. *Limón*: limón amarillo alargado o lima verde redonda).
+5. La línea **"Por qué"** muestra los 3 candidatos y el método usado, para revisar cualquier confusión.
+
+**Calibrar mejora el reconocimiento**: con la escala real, el tamaño separa productos de color y forma parecidos (una lima mide ~4-5 cm; una manzana, 7-8 cm). **Enseñar** (botón *Guardar ejemplo* o tecla `E`) con 2-3 ejemplos por producto adapta el programa a sus frutas y su luz; en la web se guardan en el navegador y en escritorio en `entrenamiento.json`.
+
+Prueba con frutas sintéticas (9 tipos × 4 escenas de luz/fondo, calibrado y sin calibrar): la versión anterior acertaba el 53 % (confundía siempre la manzana verde con limón); la actual, el 100 %, y el 100 % también con 8 frutas que no se usaron para ajustar los perfiles. Con luz cálida sobre madera (el color no se puede corregir) acierta el 85 %, y el 94 % tras enseñar 2 ejemplos por fruta.
+
 ## Recomendaciones para la cámara real
 - Un fondo de color **distinto** al producto (mesa, mantel u hoja) y buena luz. Que el producto no toque el borde de la imagen.
 - Calibre la escala una vez: ponga **sola** una tarjeta de color (carnet o tarjeta de crédito, 8.56 cm) frente a la cámara, a la misma distancia que las frutas, y pulse **K**. Se guarda en `calibracion.json`. Si cambia la altura de la cámara, vuelva a calibrar.
@@ -43,7 +54,7 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - Si la detección falla, pulse **M** para ver la máscara y mueva la barra *Sensibilidad* (más alta = detecta productos más pálidos; más baja = ignora más sombras).
 
 ## Teclas
-`0` reconocer automáticamente · `1-6` elegir producto · `A` captura automática · `Z` zoom · `C`/`Espacio` capturar a mano · `K` calibrar · `B` fondo · `D` discos · `M` máscara · `Q`/`Esc` salir
+`0` reconocer automáticamente · `1-7` elegir producto · `E` enseñar ejemplo · `A` captura automática · `Z` zoom · `C`/`Espacio` capturar a mano · `K` calibrar · `B` fondo · `D` discos · `M` máscara · `Q`/`Esc` salir
 
 Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D y convergencia de Riemann) y una fila en `resultados.csv` (se abre con Excel).
 
@@ -53,7 +64,7 @@ Edite `productos.py` y agregue una ficha (densidad, color de madurez, umbrales, 
 ## Limitaciones (para mencionar en el informe)
 - El método de discos supone que el producto es **simétrico alrededor de su eje mayor**. Funciona bien con naranja, tomate, limón, manzana o mango, y mal con banano.
 - La cámara ve una proyección 2D. La silueta está un poco más cerca de la cámara que la hoja, así que la escala tiene un pequeño error de perspectiva.
-- El reconocimiento usa reglas de color y forma (ver el perfil de cada ficha en `productos.py`), no inteligencia artificial: puede confundir productos del mismo color y forma, como **tomate y manzana roja**. En ese caso elija el producto a mano.
+- El reconocimiento usa reglas de color, forma y tamaño más los ejemplos que usted enseñe (vecino más cercano), no una red neuronal. Los pares más difíciles son **tomate / manzana roja** y, sin calibrar, **lima / manzana verde**. Calibre y enseñe 2-3 ejemplos de cada uno, o elija el producto a mano. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
 - Densidades aproximadas: para mejorar el peso estimado hay que pesar algunas frutas reales y ajustar la densidad en `productos.py`.
 
 ## Archivos
