@@ -112,7 +112,7 @@
     <canvas id="foto" class="oculto"></canvas>
     <p class="ayuda">Contorno en verde · manchas (daño) en rojo · discos en amarillo · eje de revolución en celeste.
       Con la captura automática, deje la fruta quieta ~1 s y se guarda sola.<br>
-      Teclas: <kbd>0</kbd> automático · <kbd>1-7</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
+      Teclas: <kbd>0</kbd> automático · <kbd>1-9</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
       <kbd>E</kbd> enseñar · <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
   </section>
 
@@ -124,9 +124,9 @@
     <div id="estado" class="estado">—<small>Esperando imagen</small></div>
     <dl>
       <dt>Área <span class="f">∫(f−g)dx</span></dt><dd id="v_area">—</dd>
-      <dt>Volumen <span class="f">π∫r²dx</span></dt><dd id="v_vol">—</dd>
+      <dt>Volumen <span id="f_vol" class="f">π∫r²dx</span></dt><dd id="v_vol">—</dd>
       <dt>Peso estimado</dt><dd id="v_peso">—</dd>
-      <dt>Largo × diámetro</dt><dd id="v_dim">—</dd>
+      <dt id="t_dim">Largo × diámetro</dt><dd id="v_dim">—</dd>
       <dt>Daño</dt><dd id="v_dano">—</dd>
       <dt>Madurez</dt><dd id="v_mad">—</dd>
       <dt>Calibre</dt><dd id="v_cal">—</dd>
@@ -385,7 +385,8 @@ function mostrar(d) {
   // por qué: candidatos, método y rasgos medidos (para revisar las confusiones)
   const rec = d.reconocimiento || {}, ra = d.rasgos || {};
   const cand = (rec.candidatos || []).map(([n, v]) => `${n} ${Math.round(v * 100)} %`).join(" · ");
-  const forma = ra.alarg == null ? "" : ` · forma ${ra.alarg.toFixed(2)} (${ra.alarg < 1.12 ? "redonda" : "alargada"})`;
+  const tipo = ra.alarg < 1.12 ? "redonda" : ra.alarg < 2 ? "alargada" : "muy alargada";
+  const forma = ra.alarg == null ? "" : ` · forma ${ra.alarg.toFixed(2)} (${tipo}${ra.curvatura >= 0.06 && ra.alarg >= 1.8 ? ", curva" : ""})`;
   const tam = st.calibrado && ra.diam_cm ? ` · Ø ${ra.diam_cm.toFixed(1)} cm` : "";
   $("porque").textContent = `Por qué: ${cand} — ${rec.metodo === "ejemplos" ? "por sus ejemplos" : "por reglas"}` +
     `${rec.motivo ? " (" + rec.motivo + ")" : ""}${forma}${tam}`;
@@ -394,6 +395,9 @@ function mostrar(d) {
   $("v_area").textContent = fmt(s.area_cm2, 1) + " cm²";
   $("v_vol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
   $("v_peso").textContent = fmt(s.peso_g, 0) + " g";
+  const curvo = r.metodo_volumen === "curvo";
+  $("t_dim").textContent = curvo ? "Largo (arco) × grosor" : "Largo × diámetro";
+  $("f_vol").textContent = curvo ? "π∫r²ds" : "π∫r²dx";
   $("v_dim").textContent = `${fmt(s.largo_cm, 1)} × ${fmt(s.diametro_cm, 1)} cm`;
   $("v_dano").textContent = fmt(s.dano_pct, 1) + " %";
   $("v_mad").textContent = s.madurez_pct == null ? "no aplica" : fmt(s.madurez_pct, 0) + " %";
@@ -561,19 +565,19 @@ function ensenar() {
   const d = st.det, viejo = st.modo === "camara" && performance.now() / 1000 - st.ultimaDet > 1.0;
   if (!d?.detectado || !d.rasgos || viejo) { aviso("Primero ponga el producto frente a la cámara (o suba una foto)."); return; }
   const id = +$("ensenarProd").value;
-  st.ejemplos.push({ producto: id, rasgos: d.rasgos });
+  st.ejemplos.push({ producto: id, nombre: nombre(id), rasgos: d.rasgos });
   if (st.ejemplos.length > 150) st.ejemplos.shift();
   localStorage.ejemplos = JSON.stringify(st.ejemplos);
   mostrarConteo(); st.votos = {}; analizarUnaVez();
-  const n = st.ejemplos.filter(e => e.producto === id).length;
+  const n = st.ejemplos.filter(e => (e.nombre || nombre(e.producto)) === nombre(id)).length;
   aviso(`Ejemplo guardado: ${nombre(id)} (${n} ${n === 1 ? "ejemplo" : "ejemplos"}).` +
         (n < 2 ? " Conviene guardar 2-3 por producto, en distintas posiciones." : ""), 4000);
 }
 
 function mostrarConteo() {
   const c = {};
-  st.ejemplos.forEach(e => c[e.producto] = (c[e.producto] || 0) + 1);
-  const txt = Object.entries(c).map(([id, n]) => `${nombre(+id)} ${n}`).join(" · ");
+  st.ejemplos.forEach(e => { const n = e.nombre || nombre(e.producto); c[n] = (c[n] || 0) + 1; });
+  const txt = Object.entries(c).map(([n, k]) => `${n} ${k}`).join(" · ");
   $("conteo").innerHTML = txt ? `Ejemplos guardados: ${txt} <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
                               : "Sin ejemplos: se reconoce solo con las reglas de cada ficha.";
   const b = $("btnOlvidarEj");
@@ -641,11 +645,15 @@ document.addEventListener("keydown", e => {
 (async () => {
   mostrarEscala(); guardarHistorial(); marcarBotones();
   st.productos = await (await fetch("/api/productos")).json();
+  const grupos = lista => ["Fruta", "Verdura", "Otro"].map(cat => {
+    const ps = st.productos.filter(p => (p.categoria || "Otro") === cat);
+    return ps.length ? `<optgroup label="${{Fruta: "Frutas", Verdura: "Verduras", Otro: "Otro"}[cat]}">${ps.map(lista).join("")}</optgroup>` : "";
+  }).join("");
   $("producto").innerHTML = `<option value="-1">Automático (reconocer)</option>` +
-    st.productos.map(p => `<option value="${p.id}">${p.id + 1}. ${p.nombre}</option>`).join("");
+    grupos(p => `<option value="${p.id}">${p.id < 9 ? (p.id + 1) + ". " : ""}${p.nombre}</option>`);
   if (st.producto >= st.productos.length || st.producto < -1 || Number.isNaN(st.producto)) st.producto = -1;
   $("producto").value = st.producto;
-  $("ensenarProd").innerHTML = st.productos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join("");
+  $("ensenarProd").innerHTML = grupos(p => `<option value="${p.id}">${p.nombre}</option>`);
   if (st.producto >= 0) $("ensenarProd").value = st.producto;
   st.ejemplos = st.ejemplos.filter(e => e.producto < st.productos.length);
   mostrarConteo();

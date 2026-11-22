@@ -17,7 +17,20 @@ Para cada columna de píxeles x se obtienen:
         r(x) = ( f(x) - g(x) ) / 2
         V = π ∫[a,b] r(x)² dx
 
-3) SUMAS DE RIEMANN
+3) EJE CURVO (banano y otros productos alargados y curvos)
+   El eje ya no es una recta sino la LÍNEA MEDIA de la silueta
+        c(x) = ( f(x) + g(x) ) / 2      (suavizada con un polinomio)
+   Su LONGITUD DE ARCO es el largo real del producto:
+        L = ∫[a,b] √( 1 + c'(x)² ) dx            ds = √(1 + c'(x)²) dx
+   Los discos se ponen PERPENDICULARES al eje curvo. Si la recta tangente
+   forma un ángulo θ con el eje x (tan θ = c'(x)), el grosor vertical
+   f - g mide 2r / cos θ, así que el radio perpendicular es
+        r⊥(x) = ( f(x) - g(x) ) / 2 · cos θ = r(x) / √(1 + c'(x)²)
+   y el volumen (discos de grosor ds a lo largo de la curva) es
+        V = π ∫ r⊥(s)² ds = π ∫[a,b] r⊥(x)² √(1 + c'(x)²) dx
+   Si el producto es recto, c'(x) = 0 y todo se reduce al método de discos normal.
+
+4) SUMAS DE RIEMANN
    La imagen es discreta: cada columna de píxeles es un rectángulo de
    ancho Δx = 1 px. Por eso la integral se calcula como suma de Riemann:
         A ≈ Σ ( f(x_i) - g(x_i) ) Δx        V ≈ Σ π r(x_i)² Δx
@@ -25,7 +38,7 @@ Para cada columna de píxeles x se obtienen:
    cuando n crece (Δx -> 0).
 
 Conversión de unidades: si la escala es k píxeles por cm,
-   área (cm²) = área (px²) / k²       volumen (cm³) = volumen (px³) / k³
+   longitud (cm) = px / k     área (cm²) = px² / k²     volumen (cm³) = px³ / k³
 """
 import numpy as np
 
@@ -48,8 +61,34 @@ def perfiles(mascara_alineada):
     f -= eje
     g -= eje
     x = (columnas - columnas[0]) + 0.5                  # centro de cada columna, x inicia en 0
-    return {"x": x, "f": f, "g": g,
+    return {"x": x, "f": f, "g": g, "eje_px": float(eje),
             "columnas": columnas, "fila_sup": fila_sup, "fila_inf": fila_inf}
+
+
+def linea_media(x, f, g, grado=3):
+    """
+    Eje curvo: c(x) = [f(x) + g(x)] / 2 suavizado con un polinomio de grado 3 por
+    mínimos cuadrados (las columnas más gruesas pesan más; las puntas delgadas, menos).
+    Devuelve c(x) y su derivada c'(x).
+    """
+    h = f - g
+    c = (f + g) / 2
+    if len(x) < 8:
+        return np.full_like(x, np.average(c, weights=np.maximum(h, 1e-9))), np.zeros_like(x)
+    xm, xs = x.mean(), max(x.std(), 1e-9)
+    u = (x - xm) / xs
+    coef = np.polyfit(u, c, grado, w=np.sqrt(np.maximum(h, 1e-9)))
+    return np.polyval(coef, u), np.polyval(np.polyder(coef), u) / xs
+
+
+def flecha_relativa(x, c):
+    """Curvatura del eje: flecha (máxima separación entre la curva y la cuerda) / cuerda."""
+    p0, p1 = np.array([x[0], c[0]]), np.array([x[-1], c[-1]])
+    cuerda = float(np.linalg.norm(p1 - p0))
+    if cuerda <= 0:
+        return 0.0
+    d = np.abs((p1[0] - p0[0]) * (c - p0[1]) - (p1[1] - p0[1]) * (x - p0[0])) / cuerda
+    return float(d.max() / cuerda)
 
 
 def integral_riemann(x, y, n=None, regla="medio"):
@@ -75,7 +114,11 @@ def integral_riemann(x, y, n=None, regla="medio"):
 
 
 def medir(mascara_alineada, px_por_cm, n_convergencia=(2, 4, 8, 16, 32, 64, 128)):
-    """Aplica las integrales de área y volumen y devuelve todo en cm."""
+    """
+    Aplica las integrales de área y volumen y devuelve todo en cm.
+    Calcula las dos versiones del volumen: eje recto (método de discos clásico) y
+    eje curvo (vision.analizar elige cuál usar según el producto y su curvatura).
+    """
     p = perfiles(mascara_alineada)
     if p is None:
         return None
@@ -87,11 +130,19 @@ def medir(mascara_alineada, px_por_cm, n_convergencia=(2, 4, 8, 16, 32, 64, 128)
     area_px = integral_riemann(x, h)                     # ∫ (f - g) dx
     vol_px = np.pi * integral_riemann(x, r ** 2)         # π ∫ r² dx
 
-    convergencia = []
+    # eje curvo: c(x), ds/dx = √(1 + c'²), radio perpendicular r⊥ = r / √(1 + c'²)
+    c, dc = linea_media(x, f, g)
+    dsdx = np.sqrt(1 + dc ** 2)
+    r_perp = r / dsdx
+    integrando_curvo = r_perp ** 2 * dsdx                # π ∫ r⊥² ds = π ∫ r⊥² √(1+c'²) dx
+    vol_curvo_px = np.pi * integral_riemann(x, integrando_curvo)
+    arco_px = integral_riemann(x, dsdx)                  # L = ∫ √(1 + c'²) dx
+
+    convergencia, convergencia_curvo = [], []
     for n in n_convergencia:
         a_n = integral_riemann(x, h, n) * s ** 2
-        v_n = np.pi * integral_riemann(x, r ** 2, n) * s ** 3
-        convergencia.append((n, a_n, v_n))
+        convergencia.append((n, a_n, np.pi * integral_riemann(x, r ** 2, n) * s ** 3))
+        convergencia_curvo.append((n, a_n, np.pi * integral_riemann(x, integrando_curvo, n) * s ** 3))
 
     p.update({
         "x_cm": x * s, "f_cm": f * s, "g_cm": g * s, "r_cm": r * s,
@@ -101,5 +152,14 @@ def medir(mascara_alineada, px_por_cm, n_convergencia=(2, 4, 8, 16, 32, 64, 128)
         "diametro_cm": float(h.max()) * s,
         "convergencia": convergencia,
         "px_por_cm": px_por_cm,
+        # eje curvo
+        "c_px": c, "dc": dc, "c_cm": c * s, "r_perp_cm": r_perp * s,
+        "s_cm": (np.cumsum(dsdx) - dsdx / 2) * s,         # posición sobre el arco
+        "volumen_curvo_cm3": vol_curvo_px * s ** 3,
+        "largo_arco_cm": arco_px * s,
+        "grosor_cm": float((h / dsdx).max()) * s,
+        "curvatura": flecha_relativa(x, c),
+        "convergencia_curvo": convergencia_curvo,
+        "metodo_volumen": "recto",
     })
     return p

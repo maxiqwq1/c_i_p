@@ -4,7 +4,7 @@ INSPECCIÓN EN VIVO CON LA CÁMARA DEL PC
 Apunte la cámara al producto: se detecta solo, en cualquier parte de la
 imagen y sobre cualquier fondo liso o de un color distinto al producto
 (mesa, mantel, hoja...). El programa:
-  - reconoce qué producto es (o use 1-7 para elegirlo a mano),
+  - reconoce qué producto es, fruta o verdura (o elíjalo a mano con 1-9 / N / P),
   - hace zoom sobre él,
   - calcula en tiempo real área (∫(f−g)dx), volumen (π∫r²dx), peso, % de daño,
     madurez y estado,
@@ -12,8 +12,9 @@ imagen y sobre cualquier fondo liso o de un color distinto al producto
 
 Teclas:
   0          reconocer el producto automáticamente (predeterminado)
-  1-7        elegir el producto a mano (ver productos.py)
-  E          enseñar: guarda la fruta actual como ejemplo del producto elegido con 1-7
+  1-9        elegir a mano uno de los primeros 9 productos (ver la lista al iniciar)
+  N / P      producto siguiente / anterior de la lista (para llegar a todos)
+  E          enseñar: guarda el producto actual como ejemplo del elegido a mano
              (si confunde productos, 2-3 ejemplos de cada uno lo corrigen; se guardan en entrenamiento.json)
   A          activar/desactivar la captura automática
   Z          activar/desactivar el zoom al producto
@@ -87,9 +88,20 @@ def cargar_calibracion():
 def cargar_ejemplos():
     try:
         with open(ARCHIVO_EJ, encoding="utf-8") as fh:
-            return [e for e in json.load(fh) if 0 <= e["producto"] < len(PRODUCTOS)]
-    except (OSError, ValueError, KeyError, TypeError):
+            datos = json.load(fh)
+    except (OSError, ValueError):
         return []
+    # el nombre manda (si se agregan productos, los índices cambian); el índice es respaldo
+    por_nombre = {p.nombre: i for i, p in enumerate(PRODUCTOS)}
+    ejemplos = []
+    for e in datos if isinstance(datos, list) else []:
+        try:
+            i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
+            if 0 <= i < len(PRODUCTOS) and len(e["rasgos"]["hist"]) == 18:
+                ejemplos.append({**e, "producto": i})
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue
+    return ejemplos
 
 
 def guardar_ejemplos(ejemplos):
@@ -224,9 +236,11 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
         mad = "no aplica" if suav["madurez_pct"] is None else f"{suav['madurez_pct']:.0f} %"
         lineas = [
             f"Área  ∫(f−g)dx  = {suav['area_cm2']:.1f} cm²",
-            f"Volumen  π∫r²dx = {suav['volumen_cm3']:.0f} cm³",
+            f"Volumen  π∫r²{'ds' if r.get('metodo_volumen') == 'curvo' else 'dx'} = {suav['volumen_cm3']:.0f} cm³",
             f"Peso estimado = {suav['peso_g']:.0f} g",
-            f"Largo × diámetro = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm",
+            (f"Largo (arco) × grosor = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"
+             if r.get("metodo_volumen") == "curvo" else
+             f"Largo × diámetro = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"),
             f"Daño = {suav['dano_pct']:.1f} %",
             f"Madurez = {mad}",
             f"Calibre: {r['calibre']}",
@@ -243,7 +257,7 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
                    (18, y + 24), 17, gris))
     if fondo_activo:
         textos.append(("Modo fondo capturado (B para quitar)", (18, y + 48), 17, gris))
-    ayuda = ["0 automático · 1-7 elegir · E enseñar", "C / Espacio  capturar a mano", "K  calibrar con tarjeta",
+    ayuda = ["0 automático · 1-9 / N / P elegir · E enseñar", "C / Espacio  capturar a mano", "K  calibrar con tarjeta",
              "B  fondo vacío   D  discos   M  máscara", "Q / Esc  salir"]
     for i, t in enumerate(ayuda):
         textos.append((t, (18, H - 26 - (len(ayuda) - i) * 24), 17, gris))
@@ -307,6 +321,7 @@ def main():
     cv2.namedWindow(VENTANA, cv2.WINDOW_NORMAL)
     cv2.createTrackbar("Sensibilidad", VENTANA, 50, 100, lambda v: None)
     print(__doc__)
+    print("Productos:", " · ".join(f"{i + 1}. {p.nombre}" if i < 9 else p.nombre for i, p in enumerate(PRODUCTOS)))
 
     fallos = 0
     while True:
@@ -363,6 +378,13 @@ def main():
         if tecla == ord("0"):
             producto_fijo = None
             seg.reiniciar()
+        elif tecla in (ord("n"), ord("N"), ord("p"), ord("P")):
+            paso = 1 if tecla in (ord("n"), ord("N")) else -1
+            i = PRODUCTOS.index(producto_fijo) if producto_fijo is not None else (-1 if paso > 0 else 0)
+            producto_fijo = PRODUCTOS[(i + paso) % len(PRODUCTOS)]
+            suav = None
+            seg.reiniciar()
+            print(f"Producto elegido a mano: {producto_fijo.nombre} (0 = automático)")
         elif ord("1") <= tecla <= ord("9") and tecla - ord("1") < len(PRODUCTOS):
             producto_fijo = PRODUCTOS[tecla - ord("1")]
             suav = None
@@ -374,9 +396,10 @@ def main():
             if r is None:
                 print("Enseñar: no hay producto a la vista.")
             elif producto_fijo is None:
-                print("Enseñar: primero diga qué producto es con las teclas 1-7, y luego pulse E.")
+                print("Enseñar: primero diga qué producto es (teclas 1-9, N o P) y luego pulse E.")
             else:
-                ejemplos.append({"producto": PRODUCTOS.index(producto_fijo), "rasgos": r["rasgos"]})
+                ejemplos.append({"producto": PRODUCTOS.index(producto_fijo), "nombre": producto_fijo.nombre,
+                                 "rasgos": r["rasgos"]})
                 guardar_ejemplos(ejemplos)
                 n = sum(e["producto"] == PRODUCTOS.index(producto_fijo) for e in ejemplos)
                 print(f"Ejemplo guardado: {producto_fijo.nombre} ({n}). Para volver al modo automático pulse 0.")

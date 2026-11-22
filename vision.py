@@ -47,8 +47,9 @@ def _distancia_fondo(lab, centros):
 def _elegir_objeto(mascara):
     """
     De todas las regiones candidatas elige la que más parece un producto:
-    tamaño razonable, forma compacta (convexa), que no toque el borde y
-    que esté cerca del centro. Así se ignoran la mesa, sombras y objetos cortados.
+    tamaño razonable, forma compacta (convexa) o alargada pero gruesa (banano,
+    zanahoria, pepino), que no toque el borde y que esté cerca del centro.
+    Así se ignoran la mesa, sombras, lápices y objetos cortados.
     """
     H, W = mascara.shape
     contornos, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -60,10 +61,14 @@ def _elegir_objeto(mascara):
             continue
         casco = cv2.contourArea(cv2.convexHull(c))
         solidez = area / casco if casco > 0 else 0
-        if solidez < 0.8:
-            continue
         (_, _), (rw, rh), _ = cv2.minAreaRect(c)
-        if max(rw, rh) > 4 * max(min(rw, rh), 1):      # muy alargado: lápiz, cuchillo, borde de mesa
+        largo, ancho = max(rw, rh), max(min(rw, rh), 1)
+        alargado = largo > 2 * ancho
+        # un banano es curvo (poco convexo); una fruta redonda debe ser casi convexa
+        if solidez < (0.6 if alargado else 0.8):
+            continue
+        # demasiado alargado o demasiado delgado: lápiz, cuchillo, cable, borde de mesa
+        if largo > 8 * ancho or ancho < 0.035 * min(H, W):
             continue
         p = c.reshape(-1, 2)
         en_borde = np.mean((p[:, 0] <= 2) | (p[:, 1] <= 2) | (p[:, 0] >= W - 3) | (p[:, 1] >= H - 3))
@@ -72,7 +77,7 @@ def _elegir_objeto(mascara):
         m = cv2.moments(c)
         cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
         d_centro = np.hypot((cx - W / 2) / (W / 2), (cy - H / 2) / (H / 2)) / np.sqrt(2)
-        puntaje = np.sqrt(frac) * solidez ** 3 * (1 - 0.6 * d_centro)
+        puntaje = np.sqrt(frac) * solidez ** (1.5 if alargado else 3) * (1 - 0.6 * d_centro)
         if puntaje > mejor_puntaje:
             mejor, mejor_puntaje = c, puntaje
     return mejor
@@ -159,16 +164,30 @@ def _a_lista(puntos):
 
 def geometria(r, n_discos=16):
     """
-    Segmentos para dibujar sobre el video: n_discos líneas verticales (los discos
-    del método de discos) y el eje de revolución, en coordenadas de la imagen.
+    Para dibujar sobre el video, en coordenadas de la imagen:
+      discos  n_discos segmentos (los discos del método de discos); con eje curvo
+              son perpendiculares a la curva
+      eje     polilínea del eje de revolución (recto: 2 puntos; curvo: la curva)
     """
     cols, sup, inf = r["columnas"], r["fila_sup"], r["fila_inf"]
     idx = np.linspace(0, len(cols) - 1, n_discos + 2).astype(int)[1:-1]
-    discos = [_a_lista(a_imagen([(cols[i] + 0.5, sup[i]), (cols[i] + 0.5, inf[i] + 1)],
-                                r["Minv"], r["desplazamiento"])) for i in idx]
+    M, d = r["Minv"], r["desplazamiento"]
+    if r.get("metodo_volumen") == "curvo":
+        # fila del eje curvo en la imagen alineada: c = -(fila) - eje  ->  fila = -c - eje
+        fila_c = -(r["c_px"] + r["eje_px"])
+        pend = -r["dc"]                                   # pendiente en filas (la y de la imagen baja)
+        medio = (inf + 1 - sup) / 2 / np.sqrt(1 + r["dc"] ** 2)     # radio perpendicular (px)
+        discos = []
+        for i in idx:
+            n = np.array([-pend[i], 1.0]) / np.hypot(pend[i], 1.0)   # normal a la curva
+            c0 = np.array([cols[i] + 0.5, fila_c[i]])
+            discos.append(_a_lista(a_imagen([c0 - medio[i] * n, c0 + medio[i] * n], M, d)))
+        j = np.linspace(0, len(cols) - 1, 40).astype(int)
+        eje = _a_lista(a_imagen(np.stack([cols[j] + 0.5, fila_c[j]], 1), M, d))
+        return discos, eje
+    discos = [_a_lista(a_imagen([(cols[i] + 0.5, sup[i]), (cols[i] + 0.5, inf[i] + 1)], M, d)) for i in idx]
     fila_eje = np.median((sup + inf + 1) / 2)
-    eje = _a_lista(a_imagen([(cols[0], fila_eje), (cols[-1] + 1, fila_eje)],
-                            r["Minv"], r["desplazamiento"]))
+    eje = _a_lista(a_imagen([(cols[0], fila_eje), (cols[-1] + 1, fila_eje)], M, d))
     return discos, eje
 
 
@@ -203,7 +222,7 @@ def anotar(frame, r, ver_discos=True):
         discos, eje = geometria(r)
         for p0, p1 in discos:
             cv2.line(vista, tuple(p0), tuple(p1), (0, 220, 255), 1)
-        cv2.line(vista, tuple(eje[0]), tuple(eje[1]), (255, 255, 0), 1, cv2.LINE_AA)
+        cv2.polylines(vista, [np.array(eje, np.int32)], False, (255, 255, 0), 1, cv2.LINE_AA)
     return vista
 
 
@@ -294,11 +313,15 @@ def balance_blancos(frame, mascara):
 def calcular_rasgos(hsv, mascara, med, calibrado):
     """
     Rasgos que describen al producto (los usa el reconocimiento y se guardan como ejemplos):
-      hist     histograma de tonos de la piel (18 grupos de 10 unidades de hue)
-      palidez  fracción de piel casi sin color (papa, cebolla, ajo)
-      sat/val  saturación y brillo medianos (0-255)
-      alarg    eje mayor / eje menor de la elipse equivalente (momentos de segundo orden)
-      diam_cm  diámetro (solo es fiable si la cámara está calibrada)
+      hist        histograma de tonos de la piel con color (18 grupos de 10 unidades de hue)
+      hist_suave  igual, pero contando también la piel poco saturada (papa, cebolla blanca)
+      palidez     fracción de piel casi sin color (blanca, gris, beige)
+      oscuro      fracción de piel casi negra (aguacate Hass maduro)
+      sat/val     saturación (de la piel con color) y brillo medianos (0-255)
+      sat_global  saturación mediana de toda la piel (para productos pálidos)
+      alarg       eje mayor / eje menor de la elipse equivalente (momentos de segundo orden)
+      curvatura   flecha / cuerda del eje (0 = recto; banano ≈ 0.1-0.3)
+      diam_cm     grosor (perpendicular al eje); solo es fiable si la cámara está calibrada
     """
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
     interior = cv2.erode(mascara, k, iterations=2) > 0
@@ -306,20 +329,27 @@ def calcular_rasgos(hsv, mascara, med, calibrado):
         interior = mascara > 0
     H, S, V = (hsv[..., i][interior] for i in range(3))
     util = (S > 45) & (V > 40)
+    suave = (S > 15) & (V > 40)
     hist180 = np.bincount(H[util], minlength=180)[:180] / max(1, int(util.sum()))
+    hist180_suave = np.bincount(H[suave], minlength=180)[:180] / max(1, int(suave.sum()))
     m = cv2.moments(mascara, binaryImage=True)
     mu20, mu02, mu11 = m["mu20"], m["mu02"], m["mu11"]
     raiz = np.sqrt(((mu20 - mu02) / 2) ** 2 + mu11 ** 2)
     l1, l2 = (mu20 + mu02) / 2 + raiz, (mu20 + mu02) / 2 - raiz
+    grupos = lambda h: [round(float(v), 4) for v in h.reshape(18, 10).sum(axis=1)]
     return {
-        "hist": [round(float(v), 4) for v in hist180.reshape(18, 10).sum(axis=1)],
-        "palidez": round(float(1 - util.mean()), 3),
+        "hist": grupos(hist180),
+        "hist_suave": grupos(hist180_suave),
+        "palidez": round(float(((S <= 45) & (V > 40)).mean()), 3),
+        "oscuro": round(float((V <= 40).mean()), 3),
         "sat": round(float(np.median(S[util])) if util.any() else float(np.median(S)), 1),
+        "sat_global": round(float(np.median(S[V > 40])) if (V > 40).any() else 0.0, 1),
         "val": round(float(np.median(V)), 1),
         "alarg": round(float(np.sqrt(l1 / max(l2, 1e-9))), 3),
-        "diam_cm": round(float(med["diametro_cm"]), 2),
+        "curvatura": round(float(med["curvatura"]), 3),
+        "diam_cm": round(float(med["grosor_cm"]), 2),
         "calibrado": bool(calibrado),
-        "_hist180": hist180,
+        "_hist180": hist180, "_hist180_suave": hist180_suave,
     }
 
 
@@ -331,23 +361,32 @@ def _cerca(v, rango, escala):
 
 
 def _puntajes_reglas(rasgos):
-    """puntaje = color × forma × viveza × tamaño  (cada factor entre 0 y 1)."""
-    h = rasgos["_hist180"]
+    """
+    puntaje = color × forma × curvatura × viveza × brillo × palidez × oscuro × tamaño
+    (cada factor entre 0 y 1; vale 1 dentro del rango de la ficha).
+    """
     puntajes = {}
     for i, p in enumerate(PRODUCTOS):
-        perfiles = p.variantes or ([{}] if p.colores else [])
-        for v in perfiles:
+        for v in p.variantes or ([{}] if p.colores else []):
+            g = lambda campo: v.get(campo, getattr(p, campo))
+            h = rasgos["_hist180_suave"] if g("palido") else rasgos["_hist180"]
             peso = np.zeros(180)
-            for h0, h1, w in v.get("colores", p.colores):
+            for h0, h1, w in g("colores"):
                 peso[h0:h1 + 1] = np.maximum(peso[h0:h1 + 1], w)
             color = float((h * peso).sum())
-            forma = _cerca(rasgos["alarg"], v.get("alargamiento", p.alargamiento), 0.05)
-            viveza = _cerca(rasgos["sat"], v.get("saturacion", p.saturacion), 35)
+            # tolerancia proporcional: 1.05 vs 1.15 es mucha diferencia; 4.0 vs 4.5, poca
+            forma = _cerca(rasgos["alarg"], g("alargamiento"), 0.05 * rasgos["alarg"] ** 2)
+            curva = _cerca(rasgos["curvatura"], g("curvatura"), 0.03) if g("curvatura") else 1.0
+            # en productos pálidos la saturación se mide en toda la piel (no solo en la parte con color)
+            viveza = _cerca(rasgos["sat_global"] if g("palido") else rasgos["sat"], g("saturacion"), 35)
+            luz = _cerca(rasgos["val"], g("brillo"), 35)
+            pal = _cerca(rasgos["palidez"], g("palidez"), 0.15)
+            osc = _cerca(rasgos["oscuro"], g("oscuro"), 0.15)
             # El tamaño ayuda pero NO veta: si la escala no corresponde a la distancia actual
             # (calibró a otra altura, celular en la mano) el diámetro sale mal.
-            tam = (0.4 + 0.6 * _cerca(rasgos["diam_cm"], v.get("diametro", p.diametro), 1.0)
+            tam = (0.4 + 0.6 * _cerca(rasgos["diam_cm"], g("diametro"), 1.0)
                    if rasgos["calibrado"] else 1.0)
-            puntajes[i] = max(puntajes.get(i, 0.0), color * forma * viveza * tam)
+            puntajes[i] = max(puntajes.get(i, 0.0), color * forma * curva * viveza * luz * pal * osc * tam)
     return puntajes
 
 
@@ -357,12 +396,24 @@ def _suavizar_hist(h):
     return h / max(h.sum(), 1e-9)
 
 
+def _hellinger(a, b):
+    ha, hb = _suavizar_hist(a), _suavizar_hist(b)
+    return float(np.sqrt(max(0.0, 1 - float(np.sqrt(ha * hb).sum()))))
+
+
 def distancia_rasgos(a, b):
-    """Qué tan distintos son dos productos (0 = idénticos). Se usa con los ejemplos enseñados."""
-    ha, hb = _suavizar_hist(a["hist"]), _suavizar_hist(b["hist"])
-    d = np.sqrt(max(0.0, 1 - float(np.sqrt(ha * hb).sum())))           # distancia de Hellinger
+    """
+    Qué tan distintos son dos productos (0 = idénticos). Se usa con los ejemplos enseñados.
+    Los rasgos que falten en un ejemplo antiguo simplemente no se comparan.
+    """
+    d = _hellinger(a["hist"], b["hist"])                                 # distancia de Hellinger
+    if "hist_suave" in a and "hist_suave" in b:
+        d += 0.5 * _hellinger(a["hist_suave"], b["hist_suave"])
     d += abs(a["sat"] - b["sat"]) / 255 + 0.5 * abs(a["val"] - b["val"]) / 255
-    d += 2.0 * abs(a["alarg"] - b["alarg"]) + abs(a["palidez"] - b["palidez"])
+    d += 2.0 * abs(np.log(a["alarg"] / b["alarg"])) + abs(a["palidez"] - b["palidez"])
+    for campo, peso in (("curvatura", 2.0), ("oscuro", 1.0)):
+        if campo in a and campo in b:
+            d += peso * abs(a[campo] - b[campo])
     if a.get("calibrado") and b.get("calibrado") and a["diam_cm"] > 0 and b["diam_cm"] > 0:
         d += abs(np.log(a["diam_cm"] / b["diam_cm"]))
     return float(d)
@@ -374,7 +425,7 @@ def reconocer(rasgos, ejemplos=None):
       1) Si hay EJEMPLOS enseñados y alguno se parece lo suficiente (vecino más cercano),
          gana ese: aprende las frutas y la luz reales del usuario.
       2) Si no, REGLAS: el perfil de cada ficha (productos.py).
-      3) Si nada coincide o el producto es pálido: "Genérico".
+      3) Si nada coincide: "Genérico".
     Devuelve (índice, info) con el método usado y los 3 mejores candidatos (para explicar la decisión).
     """
     if ejemplos:
@@ -389,8 +440,6 @@ def reconocer(rasgos, ejemplos=None):
             cand = [(PRODUCTOS[i].nombre, round(max(0.0, 1 - d / UMBRAL_EJEMPLO), 2)) for i, d in orden[:3]]
             return orden[0][0], {"metodo": "ejemplos", "candidatos": cand, "distancia": round(orden[0][1], 3)}
 
-    if rasgos["palidez"] > 0.7:
-        return I_GENERICO, {"metodo": "reglas", "candidatos": [("Genérico", 1.0)], "motivo": "producto pálido"}
     puntajes = _puntajes_reglas(rasgos)
     total = sum(puntajes.values()) + 0.05
     orden = sorted(puntajes.items(), key=lambda kv: kv[1], reverse=True)
@@ -415,7 +464,7 @@ def madurez(hsv, interior, dano, producto):
     return 100.0 * en_rango.mean()
 
 
-def clasificar(producto, dano_pct, madurez_pct, diametro_cm):
+def clasificar(producto, dano_pct, madurez_pct, diametro_cm, largo_cm=0.0):
     if dano_pct >= producto.dano_descarte:
         estado = "DESCARTE"
     elif dano_pct >= producto.dano_regular:
@@ -424,9 +473,10 @@ def clasificar(producto, dano_pct, madurez_pct, diametro_cm):
         estado = "BUENO"
     if madurez_pct is not None and madurez_pct < producto.madurez_min and estado == "BUENO":
         estado = "INMADURO"
+    medida = largo_cm if producto.calibre_por == "largo" else diametro_cm
     calibre = "-"
-    for nombre, dmin in producto.calibres:
-        if diametro_cm >= dmin:
+    for nombre, minimo in producto.calibres:
+        if medida >= minimo:
             calibre = nombre
             break
     return estado, calibre
@@ -453,16 +503,25 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50, calibrado=
     rasgos = calcular_rasgos(hsv, mascara, med, calibrado)
     i_rec, info = reconocer(rasgos, ejemplos)
     rasgos.pop("_hist180")
+    rasgos.pop("_hist180_suave")
     automatico = producto is None
     if automatico:
         producto = PRODUCTOS[i_rec]
+
+    # Eje curvo (banano, o cualquier producto alargado y curvo): largo = longitud de arco,
+    # grosor perpendicular a la curva y volumen con discos perpendiculares al eje.
+    curvo = producto.eje_curvo or (rasgos["alarg"] >= 1.8 and rasgos["curvatura"] >= 0.03)
+    if curvo:
+        med.update({"volumen_cm3": med["volumen_curvo_cm3"], "largo_cm": med["largo_arco_cm"],
+                    "diametro_cm": med["grosor_cm"], "convergencia": med["convergencia_curvo"],
+                    "metodo_volumen": "curvo"})
 
     dano, interior, hsv = detectar_danos(color, mascara, producto)
     px_producto = cv2.countNonZero(mascara)
     px_dano = cv2.countNonZero(dano)
     dano_pct = 100.0 * px_dano / px_producto
     mad = madurez(hsv, interior, dano, producto)
-    estado, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"])
+    estado, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"], med["largo_cm"])
 
     med.update({
         "mascara": mascara, "contorno": contorno, "dano": dano,

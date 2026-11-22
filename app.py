@@ -65,15 +65,23 @@ def leer_ejemplos(texto, maximo=300):
         datos = json.loads(texto)
     except ValueError:
         return None
+    por_nombre = {p.nombre: i for i, p in enumerate(PRODUCTOS)}
     validos = []
     for e in datos[:maximo] if isinstance(datos, list) else []:
         try:
-            i, r = int(e["producto"]), e["rasgos"]
+            # el nombre manda (si se agregan productos, los índices cambian); el índice es respaldo
+            i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
+            r = e["rasgos"]
             rasgos = {"hist": [float(v) for v in r["hist"]], "calibrado": bool(r.get("calibrado")),
                       **{k: float(r[k]) for k in ("palidez", "sat", "val", "alarg", "diam_cm")}}
-        except (KeyError, TypeError, ValueError):
+            if len(r.get("hist_suave", [])) == 18:
+                rasgos["hist_suave"] = [float(v) for v in r["hist_suave"]]
+            for k in ("oscuro", "curvatura", "sat_global"):
+                if k in r:
+                    rasgos[k] = float(r[k])
+        except (KeyError, TypeError, ValueError, AttributeError):
             continue
-        if 0 <= i < len(PRODUCTOS) and len(rasgos["hist"]) == 18:
+        if 0 <= i < len(PRODUCTOS) and len(rasgos["hist"]) == 18 and rasgos["alarg"] > 0:
             validos.append({"producto": i, "rasgos": rasgos})
     return validos or None
 
@@ -105,6 +113,7 @@ def resumen(r):
         "dano_pct": numero(r["dano_pct"], 1), "madurez_pct": numero(r["madurez_pct"], 1),
         "calibre": r["calibre"], "estado": r["estado"], "producto": r["producto"],
         "producto_id": r["producto_id"], "automatico": r["automatico"],
+        "metodo_volumen": r["metodo_volumen"],
     }
 
 
@@ -126,7 +135,7 @@ def salud():
 
 @app.get("/api/productos")
 def productos():
-    return jsonify([{"id": i, "nombre": p.nombre, "madurez": p.rangos_maduro is not None}
+    return jsonify([{"id": i, "nombre": p.nombre, "categoria": p.categoria, "madurez": p.rangos_maduro is not None}
                     for i, p in enumerate(PRODUCTOS)])
 
 
