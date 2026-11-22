@@ -227,16 +227,17 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
     if r is not None:            # por qué: candidatos y método (para revisar confusiones)
         rec = r["reconocimiento"]
         cand = " · ".join(f"{n} {v * 100:.0f}%" for n, v in rec["candidatos"][:2])
-        metodo = "sus ejemplos" if rec["metodo"] == "ejemplos" else "reglas"
+        metodo = {"ejemplos": "sus ejemplos", "tabla": "tabla de colores"}.get(rec["metodo"], "reglas")
         textos.append((f"Por qué ({metodo}): {cand}", (18, 66), 14, gris))
     y = 90
     if r is None:
         textos.append(("Buscando producto…", (18, y), 19, gris))
     else:
         mad = "no aplica" if suav["madurez_pct"] is None else f"{suav['madurez_pct']:.0f} %"
+        formula = {"curvo": "π∫r²ds", "lamina": "A·e (hoja)"}.get(r.get("metodo_volumen"), "π∫r²dx")
         lineas = [
             f"Área  ∫(f−g)dx  = {suav['area_cm2']:.1f} cm²",
-            f"Volumen  π∫r²{'ds' if r.get('metodo_volumen') == 'curvo' else 'dx'} = {suav['volumen_cm3']:.0f} cm³",
+            f"Volumen  {formula} = {suav['volumen_cm3']:.0f} cm³",
             f"Peso estimado = {suav['peso_g']:.0f} g",
             (f"Largo (arco) × grosor = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"
              if r.get("metodo_volumen") == "curvo" else

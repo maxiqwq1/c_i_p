@@ -76,7 +76,7 @@ def leer_ejemplos(texto, maximo=300):
                       **{k: float(r[k]) for k in ("palidez", "sat", "val", "alarg", "diam_cm")}}
             if len(r.get("hist_suave", [])) == 18:
                 rasgos["hist_suave"] = [float(v) for v in r["hist_suave"]]
-            for k in ("oscuro", "curvatura", "sat_global"):
+            for k in ("oscuro", "curvatura", "sat_global", "asimetria", "extension", "solidez"):
                 if k in r:
                     rasgos[k] = float(r[k])
         except (KeyError, TypeError, ValueError, AttributeError):
@@ -135,13 +135,14 @@ def salud():
 
 @app.get("/ejemplos/<path:archivo>")
 def ejemplos(archivo):
-    """Fotos sintéticas de ejemplo (escala conocida: 30 px/cm) para probar sin cámara."""
+    """Fotos de la tabla de colores (ejemplos.json dice su escala supuesta) para probar sin cámara."""
     return send_from_directory(os.path.join(CARPETA_WEB, "ejemplos"), archivo, max_age=86400)
 
 
 @app.get("/api/productos")
 def productos():
-    return jsonify([{"id": i, "nombre": p.nombre, "categoria": p.categoria, "madurez": p.rangos_maduro is not None}
+    return jsonify([{"id": i, "nombre": p.nombre, "categoria": p.categoria, "madurez": p.rangos_maduro is not None,
+                     "paleta": p.paleta}                                  # colores de la tabla
                     for i, p in enumerate(PRODUCTOS)])
 
 
@@ -170,6 +171,7 @@ def api_analizar():
             "caja": list(cv2.boundingRect(r["contorno"])),          # para el zoom al producto
             "reconocido_id": r["reconocido_id"], "reconocimiento": r["reconocimiento"],
             "rasgos": r["rasgos"],                                  # la página los guarda al "Enseñar"
+            "colores": r["colores"],                                # colores medidos (para compararlos con la tabla)
         })
     return jsonify(salida)
 

@@ -9,15 +9,16 @@ La cámara observa el producto (frutas y verduras) y el programa calcula:
 | Volumen | Sólido de revolución, método de discos | V = π ∫ₐᵇ r(x)² dx, con r(x) = [f(x) − g(x)]/2 |
 | Largo de un producto curvo (banano) | Longitud de arco del eje c(x) = [f(x) + g(x)]/2 | L = ∫ₐᵇ √(1 + c′(x)²) dx |
 | Volumen de un producto curvo | Discos perpendiculares al eje curvo | V = π ∫ r⊥(s)² ds = π ∫ₐᵇ r⊥(x)² √(1 + c′(x)²) dx |
+| Volumen de una hoja (espinaca) | Lámina delgada: área entre curvas × grosor | V = e · ∫ₐᵇ [f(x) − g(x)] dx |
 | Cálculo con píxeles | Suma de Riemann (Δx = 1 píxel) | A ≈ Σ [f(xᵢ) − g(xᵢ)] Δx |
 | Área dañada | Suma doble de Riemann (cada píxel = (1/k)² cm²) | A_daño ≈ Σ ΔA |
 | Peso estimado | Volumen × densidad | m = ρ V |
 
 Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre.
 
-**Productos incluidos** (`productos.py`):
-- Frutas: naranja, tomate, limón (amarillo o lima verde), manzana roja, manzana verde/amarilla, mango, **banano** y **aguacate** (común o Hass).
-- Verduras: **papa**, **zanahoria**, **cebolla** (roja o blanca) y **pepino**.
+**Productos incluidos** (`productos.py`): los 16 de la **tabla de colores** (ver abajo).
+- Frutas: naranja, tomate, limón (amarillo o lima verde), manzana roja, manzana verde/amarilla, mango, **banano**, **aguacate** (común o Hass) y **pera**.
+- Verduras: **papa**, **zanahoria**, **cebolla** (dorada, roja o blanca), **pepino**, **pimiento** (rojo o verde), **espinaca** y **repollo**.
 - *Genérico* para cualquier otro producto: mide área, volumen y daño sin evaluar madurez.
 
 Todo es **automático**:
@@ -43,7 +44,8 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - Railway: *New Project → Deploy from GitHub repo* → elegir este repositorio → *Settings → Networking → Generate Domain*. La configuración ya está en `railway.json` (usa `requirements.txt` con OpenCV sin pantalla).
 - La cámara del navegador solo funciona con HTTPS (Railway lo da) o en `localhost`.
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
-- **Probar sin cámara**: la pantalla inicial tiene fotos sintéticas de ejemplo con escala conocida (30 px/cm). También hay enlaces directos para compartir: `/?ejemplo=banano` (o `naranja`, `manzana-verde`, `tomate`, `zanahoria`) y `/?como`, que abre la explicación de las fórmulas.
+- **Probar sin cámara**: la pantalla inicial muestra las 16 fotos de la tabla de colores, cada una con su paleta; al tocar una se analiza. Su escala es **supuesta** (se eligió para que cada producto mida su tamaño típico, p. ej. una naranja de 7.8 cm), así que sus medidas son ilustrativas. Enlaces directos para compartir: `/?ejemplo=pera` (claves: `naranja`, `tomate`, `limon`, `manzana-roja`, `manzana-verde`, `mango`, `banano`, `aguacate`, `papa`, `zanahoria`, `cebolla`, `pepino`, `pimiento`, `espinaca`, `pera`, `repollo`), `/?tabla` (la tabla completa) y `/?como` (las fórmulas).
+- Junto a los resultados se ven los **colores medidos** en la piel (los 4 principales, con su %) al lado de la **paleta de la tabla** del producto; la lámina también los muestra.
 - En el celular, el producto, su estado y el área, el volumen y el peso se muestran **sobre la cámara**, para no tener que bajar mientras se apunta; la barra inferior tiene Cámara, Foto, Capturar, Cambiar y Auto.
 
 ## Productos curvos: el eje curvo (banano)
@@ -65,16 +67,28 @@ Validación con bananos sintéticos de volumen y largo exactos:
 
 Con el flujo completo (detección + alineación + eje curvo), el error medio de volumen fue −1.8 % (banano maduro), −0.2 % (banano verde), −2.8 % (zanahoria) y −1.1 % (pepino).
 
+## La tabla de colores: entrenamiento base
+La tabla *Configuración de colores en frutas y verduras* (`web/ejemplos/tabla-colores.jpg`) es la base del reconocimiento: "cada fruta y verdura tiene una combinación única de colores que permite identificarla".
+- **Productos y paletas**: los 16 productos de la tabla y sus 4 colores (campo `paleta` en `productos.py`, medidos en los círculos de la tabla).
+- **Fotos de ejemplo**: las 16 fotos se recortaron de la tabla (`web/ejemplos/*.jpg`; la papa y la zanahoria de adelante se separaron de las de atrás). `ejemplos.json` guarda la escala supuesta de cada una.
+- **Entrenamiento**: `python entrenar_tabla.py` analiza las 16 fotos con el mismo proceso que la cámara y guarda sus rasgos en `entrenamiento_tabla.json`. El reconocimiento los usa como ejemplos de referencia (vecino más cercano, con un umbral estricto porque son fotos de estudio).
+- **Perfiles ajustados con la tabla**: las reglas de cada producto se ajustaron para reconocer esas fotos sin empeorar las pruebas anteriores.
+
+Resultados: las 16 fotos de la tabla se reconocen todas, también borrosas, oscuras, con luz cálida o fría, comprimidas, giradas o con ruido (256/256). Solo con las reglas (sin los ejemplos de la tabla) acierta 15/16 con la cámara calibrada y 13/16 sin calibrar; los casos ambiguos son manzana roja, pimiento y repollo (ver limitaciones).
+
 ## Cómo reconoce el producto
 1. **Corrige el color de la luz** (balance de blancos) si el fondo alrededor del producto es claro y neutro (hoja, pared, mesa gris): así una manzana roja con luz amarilla no parece naranja.
-2. **Mide rasgos**: histograma de tonos de la piel, saturación, brillo, palidez (piel casi sin color: papa, cebolla blanca), zonas casi negras (aguacate Hass), **alargamiento** (eje mayor/eje menor de la elipse de momentos), **curvatura** del eje (banano) y **grosor en cm**.
+2. **Mide rasgos**: histograma de tonos de la piel, saturación, brillo, palidez (piel casi sin color: papa, cebolla blanca), zonas casi negras (aguacate Hass), **alargamiento** (eje mayor/eje menor de la elipse de momentos), **curvatura** del eje (banano), **asimetría** (el cuello de la pera), **extensión** y **solidez** de la silueta (una hoja o un manojo no es redondo ni macizo) y **grosor en cm**.
 3. **Ejemplos enseñados** (si hay): si la fruta se parece lo suficiente a un ejemplo guardado, gana ese producto (vecino más cercano).
-4. **Reglas** de cada ficha (`productos.py`): puntaje = color × forma × curvatura × viveza × brillo × palidez × tamaño. Una ficha puede tener **variantes** (p. ej. *Limón*: limón amarillo alargado o lima verde redonda).
-5. La línea **"Por qué"** muestra los 3 candidatos y el método usado, para revisar cualquier confusión.
+4. **Fotos de la tabla**: si se parece mucho a una de las 16 fotos de la tabla de colores, ese producto.
+5. **Reglas** de cada ficha (`productos.py`): puntaje = color × forma × curvatura × viveza × brillo × palidez × tamaño (× asimetría, extensión y solidez si la ficha las usa). Una ficha puede tener **variantes** (p. ej. *Limón*: limón amarillo alargado o lima verde redonda).
+6. La sección **"¿Por qué?"** muestra los 3 candidatos (con su paleta) y el método usado, para revisar cualquier confusión.
 
 **Calibrar mejora el reconocimiento**: con la escala real, el tamaño separa productos de color y forma parecidos (una lima mide ~4-5 cm; una manzana, 7-8 cm). El tamaño solo *ayuda*: si la escala no corresponde a la distancia actual (calibró a otra altura o el celular está en la mano), no puede descartar al producto correcto. **Enseñar** (botón *Guardar ejemplo* o tecla `E`) con 2-3 ejemplos por producto adapta el programa a sus frutas y su luz; en la web se guardan en el navegador y en escritorio en `entrenamiento.json`.
 
-Prueba con productos sintéticos (19 tipos × 4 escenas de luz/fondo, calibrado y sin calibrar): acierta el 97 %; el único fallo es la cebolla blanca sobre hoja blanca, que no se detecta (blanco sobre blanco) y se resuelve con el modo **Fondo** (`B`). La versión de reconocimiento original acertaba el 53 % en las frutas (confundía siempre la manzana verde con limón). Con luz cálida sobre madera (el color no se puede corregir) acierta menos, y mejora tras enseñar 2 ejemplos por producto.
+Prueba con productos sintéticos (19 tipos × 4 escenas de luz/fondo, calibrado y sin calibrar): acierta el 97 %; el único fallo es la cebolla blanca sobre hoja blanca, que no se detecta (blanco sobre blanco) y se resuelve con el modo **Fondo** (`B`). Frutas que no se usaron para ajustar: 100 %. Con luz cálida sobre madera (el color no se puede corregir) acierta el 84 %, y el 97 % tras enseñar 2 ejemplos por producto. La versión de reconocimiento original acertaba el 53 % en las frutas (confundía siempre la manzana verde con limón).
+
+Productos nuevos de la tabla (sintéticos, 4 escenas): la pera y la hoja de espinaca se reconocen siempre; el pimiento (rojo o verde) y el repollo, siempre que la cámara esté **calibrada** (su color y forma son como los de un tomate, una lima o una manzana verde: lo que los separa es el tamaño); la cebolla dorada falla sobre madera, que es de su mismo color.
 
 ## Recomendaciones para la cámara real
 - Un fondo de color **distinto** al producto (mesa, mantel u hoja) y buena luz. Que el producto no toque el borde de la imagen.
@@ -89,12 +103,13 @@ Prueba con productos sintéticos (19 tipos × 4 escenas de luz/fondo, calibrado 
 Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D y convergencia de Riemann) y una fila en `resultados.csv` (se abre con Excel).
 
 ## Agregar otros productos
-Edite `productos.py` y agregue una ficha antes de *Genérico* (densidad, color de madurez, umbrales, calibre por diámetro o por largo, eje curvo si lo necesita, y el perfil de reconocimiento: colores típicos, alargamiento, curvatura, saturación, brillo, palidez y diámetro). El cálculo de áreas y volúmenes es el mismo para cualquier producto.
+Edite `productos.py` y agregue una ficha antes de *Genérico* (densidad, color de madurez, umbrales, calibre por diámetro o por largo, eje curvo si lo necesita, su paleta, y el perfil de reconocimiento: colores típicos, alargamiento, curvatura, saturación, brillo, palidez y diámetro). El cálculo de áreas y volúmenes es el mismo para cualquier producto. Si agrega su foto a `web/ejemplos/` y a `ejemplos.json`, corra `python entrenar_tabla.py` para que también sea un ejemplo de referencia.
 
 ## Limitaciones (para mencionar en el informe)
-- El método de discos supone secciones **circulares** alrededor del eje (recto o curvo). Funciona bien con frutas redondas, banano, zanahoria, pepino, papa y cebolla. No sirve para productos que no son sólidos de revolución, como brócoli, lechuga o pimentón (que además es hueco: su peso real es mucho menor que volumen × densidad).
+- El método de discos supone secciones **circulares** alrededor del eje (recto o curvo). Funciona bien con frutas redondas, banano, zanahoria, pepino, papa, cebolla y repollo. El **pimiento** es hueco: se usa una densidad *efectiva* (0.5 g/cm³ = peso real / volumen de la silueta). La **espinaca** se mide como una hoja (lámina de 0.5 mm): con una hoja extendida el área es exacta; de un manojo solo se mide la silueta, no el peso real. Brócoli y lechuga no están incluidos.
 - La cámara ve una proyección 2D. La silueta está un poco más cerca de la cámara que la hoja, así que la escala tiene un pequeño error de perspectiva.
-- El reconocimiento usa reglas de color, forma y tamaño más los ejemplos que usted enseñe (vecino más cercano), no una red neuronal. Los pares más difíciles son **tomate / manzana roja**, **papa roja / tomate** y, sin calibrar, **lima / manzana verde**. Calibre y enseñe 2-3 ejemplos de cada uno, o elija el producto a mano. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
+- El reconocimiento usa reglas de color, forma y tamaño más ejemplos (los de la tabla y los que usted enseñe, por vecino más cercano), no una red neuronal. Los grupos más difíciles son **tomate / manzana roja / pimiento rojo** y, sin calibrar, **lima / manzana verde / repollo / pimiento verde**: calibre (el tamaño los separa), enseñe 2-3 ejemplos de cada uno o elija el producto a mano. Las fotos de la tabla son de estudio: con la cámara real decide sobre todo el perfil de cada producto. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
+- En pieles oscuras (aguacate Hass, pepino) o en hojas, las grietas y sombras naturales son casi negras: allí el umbral de daño baja con la luz y se ignoran las grietas finas, así que solo cuentan las manchas grandes y muy oscuras.
 - Densidades aproximadas: para mejorar el peso estimado hay que pesar algunas frutas reales y ajustar la densidad en `productos.py`.
 
 ## Archivos
@@ -103,4 +118,6 @@ Edite `productos.py` y agregue una ficha antes de *Genérico* (densidad, color d
 - `camara.py`: aplicación en vivo
 - `reporte.py`: lámina de gráficas
 - `demo_sintetica.py`: simulación de validación
-- `productos.py`: fichas de producto
+- `productos.py`: fichas de producto (con la paleta de la tabla de colores)
+- `entrenar_tabla.py` → `entrenamiento_tabla.json`: entrenamiento base con las fotos de la tabla
+- `web/ejemplos/`: la tabla de colores, sus 16 fotos recortadas y `ejemplos.json`

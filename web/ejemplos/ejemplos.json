@@ -1,0 +1,134 @@
+{
+ "fuente": "Tabla 'Configuración de colores en frutas y verduras' (tabla-colores.jpg)",
+ "nota": "Fotos recortadas de la tabla. La escala es SUPUESTA: se eligió para que cada producto mida su tamaño típico (largo_cm); las medidas de estos ejemplos son ilustrativas.",
+ "ejemplos": [
+  {
+   "clave": "naranja",
+   "nombre": "Naranja",
+   "foto": "naranja.jpg",
+   "px_por_cm": 34.87,
+   "largo_cm": 7.8,
+   "medida": "largo"
+  },
+  {
+   "clave": "tomate",
+   "nombre": "Tomate",
+   "foto": "tomate.jpg",
+   "px_por_cm": 38.8,
+   "largo_cm": 7.5,
+   "medida": "largo"
+  },
+  {
+   "clave": "limon",
+   "nombre": "Limón",
+   "foto": "limon.jpg",
+   "px_por_cm": 42.62,
+   "largo_cm": 8.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "manzana-roja",
+   "nombre": "Manzana roja",
+   "foto": "manzana-roja.jpg",
+   "px_por_cm": 35.12,
+   "largo_cm": 8.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "manzana-verde",
+   "nombre": "Manzana verde",
+   "foto": "manzana-verde.jpg",
+   "px_por_cm": 36.28,
+   "largo_cm": 7.8,
+   "medida": "largo"
+  },
+  {
+   "clave": "mango",
+   "nombre": "Mango",
+   "foto": "mango.jpg",
+   "px_por_cm": 26.0,
+   "largo_cm": 12.5,
+   "medida": "largo"
+  },
+  {
+   "clave": "banano",
+   "nombre": "Banano",
+   "foto": "banano.jpg",
+   "px_por_cm": 30.44,
+   "largo_cm": 16.0,
+   "medida": "largo sobre el arco"
+  },
+  {
+   "clave": "aguacate",
+   "nombre": "Aguacate",
+   "foto": "aguacate.jpg",
+   "px_por_cm": 31.2,
+   "largo_cm": 10.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "papa",
+   "nombre": "Papa",
+   "foto": "papa.jpg",
+   "px_por_cm": 39.22,
+   "largo_cm": 9.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "zanahoria",
+   "nombre": "Zanahoria",
+   "foto": "zanahoria.jpg",
+   "px_por_cm": 24.0,
+   "largo_cm": 17.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "cebolla",
+   "nombre": "Cebolla",
+   "foto": "cebolla.jpg",
+   "px_por_cm": 34.94,
+   "largo_cm": 8.5,
+   "medida": "largo"
+  },
+  {
+   "clave": "pepino",
+   "nombre": "Pepino",
+   "foto": "pepino.jpg",
+   "px_por_cm": 20.07,
+   "largo_cm": 21.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "pimiento",
+   "nombre": "Pimiento",
+   "foto": "pimiento.jpg",
+   "px_por_cm": 30.74,
+   "largo_cm": 9.5,
+   "medida": "largo"
+  },
+  {
+   "clave": "espinaca",
+   "nombre": "Espinaca",
+   "foto": "espinaca.jpg",
+   "px_por_cm": 16.18,
+   "largo_cm": 22.0,
+   "medida": "largo"
+  },
+  {
+   "clave": "pera",
+   "nombre": "Pera",
+   "foto": "pera.jpg",
+   "px_por_cm": 28.0,
+   "largo_cm": 10.5,
+   "medida": "largo"
+  },
+  {
+   "clave": "repollo",
+   "nombre": "Repollo",
+   "foto": "repollo.jpg",
+   "px_por_cm": 19.18,
+   "largo_cm": 17.0,
+   "medida": "largo"
+  }
+ ]
+}

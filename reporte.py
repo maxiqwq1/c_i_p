@@ -8,12 +8,34 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
 import calculo
 import vision
+from productos import PRODUCTOS
 
 COLOR_ESTADO = {"BUENO": "#1a9850", "REGULAR": "#f39c12", "INMADURO": "#2e86c1", "DESCARTE": "#c0392b"}
+
+
+def colores_tabla(ax, r, y=0.2):
+    """Colores medidos en la piel (barra, cada uno con su %) junto a la paleta de la tabla de colores."""
+    medidos = r.get("colores") or []
+    paleta = next((p.paleta for p in PRODUCTOS if p.nombre == r["producto"]), [])
+    if not medidos and not paleta:
+        return
+    ax.text(0.0, y, "Colores", fontsize=12, color="#444", transform=ax.transAxes, va="center")
+    ax.text(0.65, y + 0.04, "medidos", fontsize=8, color="#777", transform=ax.transAxes, ha="center", va="center")
+    if paleta:
+        ax.text(0.885, y + 0.04, "tabla", fontsize=8, color="#777", transform=ax.transAxes, ha="center", va="center")
+    x0, ancho, alto = 0.55, 0.2, 0.045
+    for c in medidos:                                     # barra: cada color con su % de la piel
+        w = ancho * c["pct"] / 100
+        ax.add_patch(Rectangle((x0, y - alto / 2), w, alto, transform=ax.transAxes, fc=c["hex"], ec="none"))
+        x0 += w
+    if paleta:                                            # paleta de la tabla (círculos, como en la tabla)
+        ax.scatter([0.81 + i * 0.05 for i in range(len(paleta))], [y] * len(paleta), s=150, c=paleta,
+                   transform=ax.transAxes, edgecolors="white", linewidths=0.6, clip_on=False)
 
 
 def generar(imagen_bgr, r, ruta, n_rect=16):
@@ -21,6 +43,8 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     L = r["x_cm"][-1] + 0.5 / r["px_por_cm"]           # largo sobre el eje x (cuerda)
     s = 1.0 / r["px_por_cm"]
     curvo = r.get("metodo_volumen") == "curvo"
+    lamina = r.get("metodo_volumen") == "lamina"          # hoja (espinaca): V = área × grosor
+    e = r.get("lamina_cm", 0.0)
 
     fig = plt.figure(figsize=(17, 10))
     gs = fig.add_gridspec(2, 3, hspace=0.32, wspace=0.25)
@@ -59,7 +83,18 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     ax = fig.add_subplot(gs[0, 2], projection="3d")
     paso = max(1, len(x) // 80)
     T = np.linspace(0, 2 * np.pi, 40)[:, None]
-    if curvo:
+    if lamina:
+        ev = max(e, 0.04 * L)                            # grosor exagerado para que se vea
+        X = np.concatenate([x, x[::-1]])
+        Y = np.concatenate([f, g[::-1]])
+        for z in (-ev / 2, ev / 2):
+            ax.add_collection3d(Poly3DCollection([list(zip(X, Y, np.full_like(X, z)))],
+                                                 facecolor="#8bc34a", edgecolor="#33691e", alpha=0.8))
+        ax.set_xlim(0, L)
+        ax.set_title(r"Lámina delgada  $V=e\cdot A$" +
+                     f"\nV = {r['area_cm2']:.1f} cm² × {e:.2f} cm = {r['volumen_cm3']:.1f} cm³", fontsize=11)
+        lim = max(L / 2, float(np.abs(Y).max()))
+    elif curvo:
         c, dc, rp = r["c_cm"][::paso], r["dc"][::paso], r["r_perp_cm"][::paso]
         sec = np.sqrt(1 + dc ** 2)
         Nx, Ny = -dc / sec, 1 / sec                     # normal a la curva en el plano
@@ -85,7 +120,17 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
 
     # 4. Método de discos (vista lateral); con eje curvo, discos perpendiculares a la curva
     ax = fig.add_subplot(gs[1, 0])
-    if curvo:
+    if lamina:
+        for i in range(n_rect):
+            xm = (i + 0.5) * dx
+            fi, gi = np.interp(xm, x, f), np.interp(xm, x, g)
+            ax.add_patch(Rectangle((i * dx, gi), dx, fi - gi, fc="#aed581", ec="#33691e", alpha=0.6))
+        ax.plot(x, f, color="#c0392b", lw=1.5, label="bordes f(x), g(x)")
+        ax.plot(x, g, color="#c0392b", lw=1.5)
+        ax.set_title(f"La hoja es una lámina: {n_rect} franjas de ancho Δx = {dx:.2f} cm\n"
+                     r"cada franja aporta $e\,[f(x_i)-g(x_i)]\,\Delta x$" + f"   (grosor e = {e:.2f} cm)", fontsize=10)
+        ax.set_ylabel("y (cm)")
+    elif curvo:
         sc = r["s_cm"]                                   # posición sobre el arco
         Ls = r["largo_cm"]                               # longitud de arco
         ds = Ls / n_rect
@@ -146,9 +191,10 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     filas = [
         ("Producto", r["producto"]),
         ("Largo (sobre el arco)" if curvo else "Largo (eje mayor)", f"{r['largo_cm']:.2f} cm"),
-        ("Grosor máximo" if curvo else "Diámetro máximo", f"{r['diametro_cm']:.2f} cm"),
+        ("Grosor máximo" if curvo else "Ancho máximo" if lamina else "Diámetro máximo", f"{r['diametro_cm']:.2f} cm"),
         ("Área de la silueta", f"{r['area_cm2']:.2f} cm²"),
-        ("Volumen (eje curvo)" if curvo else "Volumen (discos)", f"{r['volumen_cm3']:.1f} cm³"),
+        ("Volumen (lámina)" if lamina else "Volumen (eje curvo)" if curvo else "Volumen (discos)",
+         f"{r['volumen_cm3']:.1f} cm³"),
         ("Peso estimado", f"{r['peso_g']:.0f} g"),
         ("Área dañada", f"{r['area_dano_cm2']:.2f} cm²  ({r['dano_pct']:.1f} %)"),
         ("Madurez (color)", mad),
@@ -159,7 +205,8 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
         y = 0.95 - i * 0.075
         ax.text(0.0, y, k, fontsize=12, color="#444", transform=ax.transAxes)
         ax.text(0.55, y, v, fontsize=12, weight="bold", transform=ax.transAxes)
-    ax.text(0.5, 0.06, r["estado"], fontsize=26, weight="bold", ha="center", color="white",
+    colores_tabla(ax, r)
+    ax.text(0.5, 0.04, r["estado"], fontsize=26, weight="bold", ha="center", color="white",
             transform=ax.transAxes,
             bbox=dict(boxstyle="round,pad=0.4", fc=COLOR_ESTADO.get(r["estado"], "#555")))
 
