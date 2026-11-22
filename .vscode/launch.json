@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "1. Cámara en vivo (inspección real)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/camara.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "2. Simulación de validación (sin cámara)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/demo_sintetica.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    }
+  ]
+}

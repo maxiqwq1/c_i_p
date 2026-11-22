@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Datos locales de cada equipo
+calibracion.json
+.vscode/settings.json
+
+# Resultados de capturas reales (se conservan las láminas de la demo)
+capturas/foto_*
+capturas/reporte_*
+capturas/resultados.csv
