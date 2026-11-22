@@ -21,6 +21,15 @@ Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y a
 
 Desde la terminal también funciona: `python camara.py` (o `python camara.py 1` si tiene otra cámara).
 
+Instalación para escritorio: `pip install -r requirements-escritorio.txt`
+
+## Versión web (celular o cualquier navegador)
+La página usa la cámara **del navegador** (en el celular, la trasera) o una foto subida, y el servidor aplica los mismos cálculos.
+- Local: `pip install flask` y luego `python app.py` → abrir http://localhost:8000
+- Railway: *New Project → Deploy from GitHub repo* → elegir este repositorio → *Settings → Networking → Generate Domain*. La configuración ya está en `railway.json` (usa `requirements.txt` con OpenCV sin pantalla).
+- La cámara del navegador solo funciona con HTTPS (Railway lo da) o en `localhost`.
+- La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
+
 ## Recomendaciones para la cámara real
 - Fondo **claro y liso** (una hoja blanca) y buena luz, sin sombras fuertes.
 - Calibre la escala una vez: ponga **sola** una tarjeta de color (carnet o tarjeta de crédito, 8.56 cm) en el recuadro y pulse **K**. Se guarda en `calibracion.json`. Si cambia la altura de la cámara, vuelva a calibrar.
