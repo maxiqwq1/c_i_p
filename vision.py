@@ -208,18 +208,51 @@ def anotar(frame, r, ver_discos=True):
 
 
 # ---------------------------------------------------------------- calidad
+def iluminacion(V, interior, iteraciones=3):
+    """
+    Cómo cae la luz sobre la fruta: superficie suave (polinomio cúbico en x, y) ajustada
+    por mínimos cuadrados al brillo de la piel. En cada vuelta se descartan los píxeles
+    mucho más oscuros que el ajuste (las manchas), para que no lo arrastren hacia abajo.
+    Devuelve el brillo esperado en cada píxel del interior.
+    """
+    ys, xs = np.nonzero(interior)
+    v = V[ys, xs].astype(np.float64)
+    cx, cy = xs.mean(), ys.mean()
+    s = max(xs.std(), ys.std(), 1.0)
+    x, y = (xs - cx) / s, (ys - cy) / s
+    A = np.stack([np.ones_like(x), x, y, x * x, x * y, y * y, x ** 3, x * x * y, x * y * y, y ** 3], axis=1)
+    paso = max(1, len(v) // 20000)                        # basta una muestra para ajustar
+    usar = np.zeros(len(v), bool)
+    usar[::paso] = True
+    ajuste = np.full(len(v), np.median(v))
+    for _ in range(iteraciones):
+        if usar.sum() < 20:
+            break
+        coef, *_ = np.linalg.lstsq(A[usar], v[usar], rcond=None)
+        ajuste = A @ coef
+        usar = (v >= 0.8 * ajuste)
+        usar[np.arange(len(v)) % paso != 0] = False
+    esperado = np.zeros(V.shape, np.float32)
+    esperado[ys, xs] = np.maximum(ajuste, 1.0)
+    return esperado
+
+
 def detectar_danos(frame, mascara, producto):
-    """Manchas = píxeles del interior mucho más oscuros que el brillo típico del producto."""
+    """
+    Manchas = píxeles del interior mucho más oscuros que la luz que les LLEGA
+    (ver iluminacion). Así la sombra del lado no iluminado no se cuenta como daño,
+    pero una mancha oscura sí, esté donde esté.
+    """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     area = cv2.countNonZero(mascara)
     diam = np.sqrt(4 * area / np.pi)
     k = max(3, int(0.08 * diam))                 # se ignora el borde (sombra natural)
     interior = cv2.erode(mascara, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
-    if cv2.countNonZero(interior) == 0:
+    if cv2.countNonZero(interior) < 50:
         return np.zeros_like(mascara), interior, hsv
     V = hsv[..., 2]
-    brillo_tipico = np.median(V[interior > 0])
-    dano = ((V < producto.factor_oscuro * brillo_tipico) & (interior > 0)).astype(np.uint8) * 255
+    esperado = iluminacion(V, interior > 0)
+    dano = ((V < producto.factor_oscuro * esperado) & (interior > 0)).astype(np.uint8) * 255
     dano = cv2.morphologyEx(dano, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     return dano, interior, hsv
 
@@ -310,7 +343,10 @@ def _puntajes_reglas(rasgos):
             color = float((h * peso).sum())
             forma = _cerca(rasgos["alarg"], v.get("alargamiento", p.alargamiento), 0.05)
             viveza = _cerca(rasgos["sat"], v.get("saturacion", p.saturacion), 35)
-            tam = _cerca(rasgos["diam_cm"], v.get("diametro", p.diametro), 0.7) if rasgos["calibrado"] else 1.0
+            # El tamaño ayuda pero NO veta: si la escala no corresponde a la distancia actual
+            # (calibró a otra altura, celular en la mano) el diámetro sale mal.
+            tam = (0.4 + 0.6 * _cerca(rasgos["diam_cm"], v.get("diametro", p.diametro), 1.0)
+                   if rasgos["calibrado"] else 1.0)
             puntajes[i] = max(puntajes.get(i, 0.0), color * forma * viveza * tam)
     return puntajes
 

@@ -14,6 +14,7 @@ Perfil de reconocimiento automático (ver vision.reconocer):
   colores       [(h_min, h_max, peso)]: tonos típicos del producto, maduro o verde.
                 peso = qué tanto ese tono indica ESTE producto (0-1).
   alargamiento  (min, max) de eje mayor / eje menor: 1.0 = redondo, 1.4 = alargado.
+                Una manzana vista de lado llega a ~1.15.
   saturacion    (min, max) de la saturación mediana (0-255): qué tan "vivo" es el color.
   diametro      (min, max) en cm. Solo se usa si la cámara está CALIBRADA; es lo que
                 mejor separa productos de color y forma parecidos (lima vs. manzana verde).
@@ -61,7 +62,7 @@ PRODUCTOS = [
              calibres=[("Grande", 5.5), ("Mediano", 4.5), ("Pequeño", 0.0)],
              saturacion=(120, 255),
              variantes=[
-                 {"colores": [(20, 34, 1.0), (34, 45, 0.5)], "alargamiento": (1.15, 1.6), "diametro": (4.0, 7.0)},
+                 {"colores": [(20, 34, 1.0), (34, 45, 0.5)], "alargamiento": (1.2, 1.7), "diametro": (4.0, 7.0)},
                  {"colores": [(34, 45, 0.5), (45, 65, 1.0)], "alargamiento": (1.0, 1.2), "diametro": (3.0, 5.8)},
              ]),
     Producto("Manzana roja", 0.80, [(0, 10), (160, 179)],
@@ -71,7 +72,7 @@ PRODUCTOS = [
     Producto("Manzana verde", 0.80, None,       # variedades verdes o amarillas: la madurez no se mide por color
              calibres=[("Grande", 7.5), ("Mediana", 6.5), ("Pequeña", 0.0)],
              colores=[(22, 32, 0.8), (32, 45, 1.0), (45, 55, 0.6), (0, 10, 0.3), (165, 179, 0.3), (12, 22, 0.4)],
-             alargamiento=(1.0, 1.14), saturacion=(50, 200), diametro=(5.8, 10.0)),
+             alargamiento=(1.0, 1.18), saturacion=(40, 240), diametro=(5.8, 10.0)),
     Producto("Mango", 1.00, [(10, 35)],
              calibres=[("Grande", 10.0), ("Mediano", 8.0), ("Pequeño", 0.0)],
              colores=[(10, 35, 0.9), (35, 70, 0.6), (0, 10, 0.5), (165, 179, 0.5)],

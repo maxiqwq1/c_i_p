@@ -17,6 +17,7 @@ Todo es **automático**:
 - **Detección en cualquier lugar**: no hace falta recuadro guía ni hoja blanca. El programa aprende los colores del fondo a partir del borde de la imagen y elige la región que más parece un producto (tamaño razonable, forma compacta, que no toque el borde). Ignora sombras, lápices y objetos cortados.
 - **Reconocimiento del producto** (ver abajo), con votación entre cuadros para que no salte. Si ningún perfil coincide, usa *Genérico*. Se puede elegir a mano.
 - **Captura automática**: cuando el producto se queda quieto ~1 s se guarda la captura y la lámina; vuelve a capturar al poner otro producto.
+- **Daño sin confundir sombras**: se estima cómo cae la luz sobre la fruta (superficie cúbica ajustada por mínimos cuadrados, ignorando las manchas) y es mancha lo que queda bastante más oscuro que *esa* luz local. Así la sombra del lado no iluminado no cuenta como daño.
 - **Zoom al producto**: la vista se acerca a la fruta (con un minimapa de la vista completa) y la foto de la lámina también.
 
 ## Cómo ejecutarlo (VS Code)
@@ -43,7 +44,7 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 4. **Reglas** de cada ficha (`productos.py`): puntaje = color × forma × viveza × tamaño. Una ficha puede tener **variantes** (p. ej. *Limón*: limón amarillo alargado o lima verde redonda).
 5. La línea **"Por qué"** muestra los 3 candidatos y el método usado, para revisar cualquier confusión.
 
-**Calibrar mejora el reconocimiento**: con la escala real, el tamaño separa productos de color y forma parecidos (una lima mide ~4-5 cm; una manzana, 7-8 cm). **Enseñar** (botón *Guardar ejemplo* o tecla `E`) con 2-3 ejemplos por producto adapta el programa a sus frutas y su luz; en la web se guardan en el navegador y en escritorio en `entrenamiento.json`.
+**Calibrar mejora el reconocimiento**: con la escala real, el tamaño separa productos de color y forma parecidos (una lima mide ~4-5 cm; una manzana, 7-8 cm). El tamaño solo *ayuda*: si la escala no corresponde a la distancia actual (calibró a otra altura o el celular está en la mano), no puede descartar al producto correcto. **Enseñar** (botón *Guardar ejemplo* o tecla `E`) con 2-3 ejemplos por producto adapta el programa a sus frutas y su luz; en la web se guardan en el navegador y en escritorio en `entrenamiento.json`.
 
 Prueba con frutas sintéticas (9 tipos × 4 escenas de luz/fondo, calibrado y sin calibrar): la versión anterior acertaba el 53 % (confundía siempre la manzana verde con limón); la actual, el 100 %, y el 100 % también con 8 frutas que no se usaron para ajustar los perfiles. Con luz cálida sobre madera (el color no se puede corregir) acierta el 85 %, y el 94 % tras enseñar 2 ejemplos por fruta.
 
