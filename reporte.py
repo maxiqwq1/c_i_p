@@ -11,6 +11,7 @@ from matplotlib.patches import Rectangle
 import numpy as np
 
 import calculo
+import vision
 
 COLOR_ESTADO = {"BUENO": "#1a9850", "REGULAR": "#f39c12", "INMADURO": "#2e86c1", "DESCARTE": "#c0392b"}
 
@@ -23,10 +24,14 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     fig = plt.figure(figsize=(17, 10))
     gs = fig.add_gridspec(2, 3, hspace=0.32, wspace=0.25)
 
-    # 1. Captura
+    # 1. Captura (con zoom al producto)
     ax = fig.add_subplot(gs[0, 0])
+    if "contorno" in r:
+        x0, y0, x1, y1 = vision.caja_enfoque(r["contorno"], imagen_bgr.shape, margen=0.3, proporcion=4 / 3)
+        imagen_bgr = imagen_bgr[y0:y1, x0:x1]
     ax.imshow(cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2RGB))
-    ax.set_title("Captura de la cámara", fontsize=12)
+    modo = " (reconocido automáticamente)" if r.get("automatico") else ""
+    ax.set_title(f"Captura: {r['producto']}{modo}", fontsize=12)
     ax.axis("off")
 
     # 2. Área entre curvas con rectángulos de Riemann

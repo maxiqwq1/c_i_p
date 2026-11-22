@@ -7,7 +7,7 @@
 <style>
   :root {
     --fondo: #14161a; --panel: #1d2026; --borde: #2c3039; --texto: #e9ecf1; --tenue: #9aa1ad;
-    --acento: #ffd15a; --verde: #1a9850; --boton: #2a2f38; --boton-h: #353b46;
+    --acento: #ffd15a; --boton: #2a2f38; --boton-h: #353b46;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--fondo); color: var(--texto);
@@ -20,19 +20,22 @@
 
   .barra { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
   button, .boton { background: var(--boton); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
-           padding: 8px 13px; font: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+           padding: 8px 13px; font: inherit; cursor: pointer; display: inline-flex; gap: 6px; align-items: center;
+           text-decoration: none; }
   button:hover, .boton:hover { background: var(--boton-h); }
   button:disabled { opacity: .45; cursor: default; }
   button.principal { background: var(--acento); color: #1b1b1b; border-color: var(--acento); font-weight: 600; }
   button.principal:hover { filter: brightness(1.06); }
   button.activo { border-color: var(--acento); color: var(--acento); }
   kbd { font: 11px ui-monospace, monospace; padding: 1px 5px; border: 1px solid var(--borde); border-radius: 4px; color: var(--tenue); }
+  button.principal kbd { color: #1b1b1b; border-color: rgba(0,0,0,.3); }
   input[type=file] { display: none; }
 
-  .lienzo { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #0b0c0e; border: 1px solid var(--borde);
-            border-radius: 10px; overflow: hidden; }
-  .lienzo video, .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .lienzo video { object-fit: fill; }
+  .lienzo { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #0b0c0e; border: 2px solid var(--borde);
+            border-radius: 10px; overflow: hidden; transition: border-color .3s; }
+  .lienzo.destello { border-color: #3ddc84; }
+  .lienzo canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
   .vacio { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--tenue); }
   .ayuda { color: var(--tenue); font-size: .85rem; margin: 10px 2px 0; }
 
@@ -41,7 +44,8 @@
   .panel h2:first-child { margin-top: 0; }
   select { width: 100%; background: var(--boton); color: var(--texto); border: 1px solid var(--borde); border-radius: 8px;
            padding: 8px 10px; font: inherit; }
-  .estado { margin-top: 14px; border-radius: 9px; padding: 12px 14px; font-size: 1.35rem; font-weight: 700; letter-spacing: .02em;
+  .reconocido { margin-top: 6px; font-size: .88rem; color: var(--tenue); min-height: 1.3em; }
+  .estado { margin-top: 12px; border-radius: 9px; padding: 12px 14px; font-size: 1.35rem; font-weight: 700; letter-spacing: .02em;
             background: #2a2f38; color: #fff; transition: background .2s; }
   .estado small { display: block; font-size: .8rem; font-weight: 400; opacity: .85; letter-spacing: 0; }
   dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 12px 0 0; }
@@ -51,16 +55,22 @@
   .acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .acciones .ancho { grid-column: 1 / -1; justify-content: center; }
   .acciones button { justify-content: space-between; }
-  label.rango { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-bottom: 8px; color: var(--tenue); font-size: .9rem; }
+  label.rango { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin-bottom: 4px; color: var(--tenue); font-size: .9rem; }
   label.rango input { grid-column: 1 / -1; width: 100%; accent-color: var(--acento); }
+  .nota { font-size: .85rem; color: var(--tenue); margin: 4px 0 0; }
   .escala { font-size: .9rem; color: var(--tenue); }
   .escala.sin { color: #ff8a5c; }
   .enlace { background: none; border: none; color: var(--acento); padding: 0; text-decoration: underline; cursor: pointer; font-size: .85rem; }
 
+  .ultima { display: none; gap: 10px; align-items: center; background: #23272e; border: 1px solid var(--borde);
+            border-radius: 8px; padding: 8px; cursor: pointer; margin-bottom: 8px; }
+  .ultima img { width: 96px; height: 60px; object-fit: cover; border-radius: 4px; background: #fff; }
+  .ultima div { font-size: .85rem; }
   table { width: 100%; border-collapse: collapse; font-size: .82rem; font-variant-numeric: tabular-nums; }
   th, td { padding: 4px 4px; border-bottom: 1px solid var(--borde); text-align: right; }
   th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
   th { color: var(--tenue); font-weight: 500; }
+  tr.ver { cursor: pointer; } tr.ver:hover td { background: #23272e; }
   .historial { max-height: 220px; overflow: auto; }
   .fila-botones { display: flex; gap: 8px; margin-top: 8px; }
 
@@ -87,21 +97,26 @@
       <button id="btnGirar" disabled>Cambiar cámara</button>
       <label class="boton" for="archivo">Subir foto</label>
       <input id="archivo" type="file" accept="image/*">
+      <button id="btnZoom" class="activo">Zoom al producto <kbd>Z</kbd></button>
+      <button id="btnAuto" class="activo">Captura automática <kbd>A</kbd></button>
     </div>
     <div id="lienzo" class="lienzo">
-      <video id="video" playsinline muted></video>
-      <canvas id="foto"></canvas>
-      <canvas id="capa"></canvas>
-      <div id="vacio" class="vacio">Ponga el producto sobre un fondo claro y liso (una hoja blanca), con buena luz.<br>
+      <canvas id="vista"></canvas>
+      <div id="vacio" class="vacio">Apunte la cámara al producto: se detecta solo, en cualquier parte de la imagen.<br>
         Pulse <b>Iniciar cámara</b> o <b>Subir foto</b>.</div>
     </div>
+    <video id="video" class="oculto" playsinline muted></video>
+    <canvas id="foto" class="oculto"></canvas>
     <p class="ayuda">Contorno en verde · manchas (daño) en rojo · discos en amarillo · eje de revolución en celeste.
-      Teclas: <kbd>1-6</kbd> producto · <kbd>C</kbd> capturar · <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
+      Con la captura automática, deje la fruta quieta ~1 s y se guarda sola.<br>
+      Teclas: <kbd>0</kbd> automático · <kbd>1-6</kbd> producto · <kbd>C</kbd> capturar · <kbd>A</kbd> auto · <kbd>Z</kbd> zoom ·
+      <kbd>K</kbd> calibrar · <kbd>B</kbd> fondo · <kbd>D</kbd> discos · <kbd>M</kbd> máscara</p>
   </section>
 
   <aside class="panel">
     <h2>Producto</h2>
     <select id="producto"></select>
+    <div id="reconocido" class="reconocido"></div>
     <div id="estado" class="estado">—<small>Esperando imagen</small></div>
     <dl>
       <dt>Área <span class="f">∫(f−g)dx</span></dt><dd id="v_area">—</dd>
@@ -124,14 +139,16 @@
 
     <h2>Escala</h2>
     <div id="escala" class="escala"></div>
-    <p class="escala" style="margin:4px 0 0">Para calibrar, ponga <b>sola</b> una tarjeta (carnet o crédito, 8.56 cm) en el recuadro y pulse Calibrar.
-      <button id="btnOlvidar" class="enlace">Borrar calibración</button></p>
+    <p class="nota">Para calibrar, ponga <b>sola</b> una tarjeta (carnet o crédito, 8.56 cm) frente a la cámara, a la misma
+      distancia que las frutas, y pulse Calibrar. <button id="btnOlvidar" class="enlace">Borrar calibración</button></p>
 
-    <h2>Ajustes de detección</h2>
-    <label class="rango">Saturación mínima <span id="t_smin">60</span><input id="smin" type="range" min="0" max="255" value="60"></label>
-    <label class="rango">Oscuro máximo <span id="t_vosc">70</span><input id="vosc" type="range" min="0" max="255" value="70"></label>
+    <h2>Detección</h2>
+    <label class="rango">Sensibilidad <span id="t_sens">50</span><input id="sens" type="range" min="0" max="100" value="50"></label>
+    <p class="nota">Súbala si no detecta frutas pálidas; bájela si toma sombras u otros objetos.
+      Para productos muy parecidos al fondo use <b>Fondo</b>: con la escena vacía púlselo y luego ponga el producto.</p>
 
     <h2>Capturas</h2>
+    <div id="ultima" class="ultima"><img id="ultimaImg" alt="Última lámina capturada"><div id="ultimaTxt"></div></div>
     <div class="historial"><table>
       <thead><tr><th>Hora</th><th>Producto</th><th>cm²</th><th>cm³</th><th>g</th><th>Daño</th><th>Estado</th></tr></thead>
       <tbody id="tabla"></tbody>
@@ -156,17 +173,20 @@
 const $ = id => document.getElementById(id);
 const MAX_ANCHO = 960;              // ancho de los cuadros enviados (la escala px/cm depende de él)
 const PX_DEFECTO = 12;
+const T_QUIETO = 1.2;               // segundos quieto para la captura automática
 const COLOR_ESTADO = { BUENO: "#1a9850", REGULAR: "#e08e0b", INMADURO: "#2e86c1", DESCARTE: "#c0392b" };
 const CLAVES = ["area_cm2", "volumen_cm3", "peso_g", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct"];
 
 const st = {
-  productos: [], producto: +(localStorage.producto || 0),
+  productos: [], producto: +(localStorage.producto ?? -1),
   px: parseFloat(localStorage.px_por_cm) || PX_DEFECTO, calibrado: !!localStorage.px_por_cm,
-  fondo: null, discos: true, mascara: false, sMin: 60, vOsc: 70,
-  modo: null, stream: null, facing: "environment", suav: null, ultimo: null,
-  historial: JSON.parse(localStorage.historial || "[]"),
+  fondo: null, discos: true, mascara: false, sens: 50, zoom: true, autoCap: true,
+  modo: null, stream: null, facing: "environment", suav: null,
+  det: null, mascaraImg: null, ultimaDet: 0, caja: null,
+  votos: {}, muestras: [], progreso: 0, capturada: null, capturando: false,
+  historial: JSON.parse(localStorage.historial || "[]"), laminas: new Map(),
 };
-const video = $("video"), foto = $("foto"), capa = $("capa"), tmp = document.createElement("canvas");
+const video = $("video"), foto = $("foto"), vista = $("vista"), tmp = document.createElement("canvas");
 
 function aviso(msg, ms = 3200) {
   const a = $("aviso"); a.textContent = msg; a.classList.add("ver");
@@ -189,17 +209,16 @@ async function iniciarCamara() {
   }
   video.srcObject = st.stream;
   await video.play();
-  st.modo = "camara"; st.suav = null;
-  foto.style.display = "none"; video.style.display = ""; $("vacio").style.display = "none";
+  reiniciarPresencia(); st.modo = "camara"; st.caja = null;
+  $("vacio").style.display = "none";
   $("btnGirar").disabled = false; $("btnCamara").textContent = "Detener cámara";
-  ajustarProporcion(video.videoWidth, video.videoHeight);
   bucle();
 }
 
 function detenerCamara() {
   if (st.stream) st.stream.getTracks().forEach(t => t.stop());
   st.stream = null; video.srcObject = null;
-  if (st.modo === "camara") st.modo = null;
+  if (st.modo === "camara") { st.modo = null; st.det = null; }
   $("btnGirar").disabled = true; $("btnCamara").textContent = "Iniciar cámara";
 }
 
@@ -211,31 +230,45 @@ function cargarFoto(archivo) {
     foto.width = Math.round(img.naturalWidth * esc); foto.height = Math.round(img.naturalHeight * esc);
     foto.getContext("2d").drawImage(img, 0, 0, foto.width, foto.height);
     URL.revokeObjectURL(img.src);
-    st.modo = "foto"; st.suav = null; st.fondo = null; marcarBotones();
-    video.style.display = "none"; foto.style.display = ""; $("vacio").style.display = "none";
-    ajustarProporcion(foto.width, foto.height);
+    st.modo = "foto"; st.fondo = null; st.det = null; st.caja = null; reiniciarPresencia(); marcarBotones();
+    $("vacio").style.display = "none";
     analizarUnaVez();
   };
   img.onerror = () => aviso("No se pudo leer la imagen.");
   img.src = URL.createObjectURL(archivo);
 }
 
-function ajustarProporcion(w, h) { if (w && h) $("lienzo").style.aspectRatio = `${w} / ${h}`; }
+/** Tamaño del cuadro que se envía al servidor (todas las coordenadas usan este espacio). */
+function tamCuadro() {
+  if (st.modo === "foto") return [foto.width, foto.height, foto, 1];
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw) return null;
+  const esc = Math.min(1, MAX_ANCHO / vw);
+  return [Math.round(vw * esc), Math.round(vh * esc), video, 1 / esc];
+}
 
 function cuadro() {
   if (st.modo === "foto") return new Promise(r => foto.toBlob(r, "image/jpeg", 0.9));
-  const esc = Math.min(1, MAX_ANCHO / video.videoWidth);
-  tmp.width = Math.round(video.videoWidth * esc); tmp.height = Math.round(video.videoHeight * esc);
-  tmp.getContext("2d").drawImage(video, 0, 0, tmp.width, tmp.height);
+  const [w, h] = tamCuadro();
+  tmp.width = w; tmp.height = h;
+  tmp.getContext("2d").drawImage(video, 0, 0, w, h);
   return new Promise(r => tmp.toBlob(r, "image/jpeg", 0.85));
 }
+
+/** Producto a enviar: el elegido, o en automático el reconocido de forma estable (o -1). */
+function productoEstable() {
+  let mejor = -1, v = 0;
+  for (const [id, x] of Object.entries(st.votos)) if (x > v) { v = x; mejor = +id; }
+  return v >= 0.6 ? [mejor, v] : [-1, v];
+}
+const productoEnviar = () => st.producto >= 0 ? st.producto : productoEstable()[0];
 
 function formulario(blob, extra = {}) {
   const fd = new FormData();
   fd.append("imagen", blob, "cuadro.jpg");
   if (st.fondo) fd.append("fondo", st.fondo, "fondo.jpg");
-  fd.append("producto", st.producto); fd.append("px_por_cm", st.px);
-  fd.append("s_min", st.sMin); fd.append("v_osc", st.vOsc);
+  fd.append("producto", productoEnviar()); fd.append("auto", st.producto < 0 ? 1 : 0);
+  fd.append("px_por_cm", st.px); fd.append("sensibilidad", st.sens);
   for (const [k, v] of Object.entries(extra)) fd.append(k, v);
   return fd;
 }
@@ -247,7 +280,9 @@ async function analizar() {
   const resp = await fetch("/api/analizar", { method: "POST", body: formulario(blob, { mascara: st.mascara ? 1 : 0 }) });
   if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
   const d = await resp.json();
-  dibujar(d); mostrar(d);
+  if (d.mascara) { const im = new Image(); im.onload = () => st.mascaraImg = im; im.src = d.mascara; } else st.mascaraImg = null;
+  st.det = d;
+  procesar(d);
 }
 
 async function bucle() {
@@ -265,32 +300,46 @@ function analizarUnaVez() {
   pendiente = setTimeout(() => analizar().catch(e => aviso("Error: " + e.message)), 120);
 }
 
-function dibujar(d) {
-  capa.width = d.ancho; capa.height = d.alto;
-  const c = capa.getContext("2d"), g = Math.max(2, d.ancho / 420);
-  c.clearRect(0, 0, d.ancho, d.alto);
-  const poli = (pts, cerrar = true) => {
-    c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (cerrar) c.closePath();
-  };
-  const resto = () => {
-    const [x0, y0, x1, y1] = d.roi;
-    c.setLineDash([8, 6]); c.strokeStyle = "rgba(255,255,255,.7)"; c.lineWidth = 1.5;
-    c.strokeRect(x0, y0, x1 - x0, y1 - y0); c.setLineDash([]);
-    if (!d.detectado) return;
-    c.fillStyle = "rgba(255,0,0,.55)";
-    d.danos.forEach(p => { poli(p); c.fill(); });
-    if (st.discos && !st.mascara) {
-      c.strokeStyle = "#ffdc00"; c.lineWidth = g * 0.6;
-      d.discos.forEach(s => { poli(s, false); c.stroke(); });
-      c.strokeStyle = "#00ffff"; poli(d.eje, false); c.stroke();
-    }
-    c.strokeStyle = "#00ff00"; c.lineWidth = g; poli(d.contorno); c.stroke();
-  };
-  if (d.mascara) {
-    const im = new Image();
-    im.onload = () => { c.drawImage(im, 0, 0, d.ancho, d.alto); resto(); };
-    im.src = d.mascara;
-  } else resto();
+// ---------------------------------------------------------------- reconocimiento y captura automática
+function reiniciarPresencia() { st.votos = {}; st.muestras = []; st.progreso = 0; st.capturada = null; st.suav = null; }
+
+function procesar(d) {
+  const ahora = performance.now() / 1000;
+  if (!d.detectado) {
+    if (ahora - st.ultimaDet > 1.0) reiniciarPresencia();     // se retiró el producto
+    mostrar(d); return;
+  }
+  st.ultimaDet = ahora;
+  // votación del reconocimiento (evita que salte entre productos cuadro a cuadro)
+  if (st.modo === "foto") st.votos = { [d.reconocido_id]: 1 };       // una sola imagen: no hay a quién votar
+  else {
+    for (const id in st.votos) st.votos[id] *= 0.7;
+    st.votos[d.reconocido_id] = (st.votos[d.reconocido_id] || 0) + 0.3;
+  }
+
+  const r = d.resultados, [x, y, w, h] = d.caja;
+  const m = { t: ahora, area: r.area_cm2, cx: (x + w / 2) / d.ancho, cy: (y + h / 2) / d.alto };
+  st.muestras.push(m);
+  st.muestras = st.muestras.filter(s => ahora - s.t < 3);
+
+  // ¿cambió de producto después de capturar? (otra fruta en el mismo lugar)
+  const c = st.capturada;
+  if (c && (Math.abs(m.area - c.area) / c.area > 0.3 || Math.hypot(m.cx - c.cx, m.cy - c.cy) > 0.15)) reiniciarPresencia();
+
+  // tiempo que lleva quieto: muestras recientes parecidas a la última
+  let desde = ahora;
+  for (let i = st.muestras.length - 1; i >= 0; i--) {
+    const s = st.muestras[i];
+    if (Math.abs(s.area - m.area) / m.area > 0.04 || Math.hypot(s.cx - m.cx, s.cy - m.cy) > 0.03) break;
+    desde = s.t;
+  }
+  const reconocido = st.producto >= 0 || productoEstable()[0] >= 0;
+  st.progreso = st.modo === "foto" ? 1 : Math.min(1, (ahora - desde) / T_QUIETO);
+  mostrar(d);
+  if (st.autoCap && st.progreso >= 1 && reconocido && !st.capturada && !st.capturando) {
+    st.capturada = { area: m.area, cx: m.cx, cy: m.cy };
+    capturar(true);
+  }
 }
 
 function suavizar(prev, r, a = 0.3) {
@@ -300,17 +349,23 @@ function suavizar(prev, r, a = 0.3) {
 }
 
 const fmt = (v, dec) => v == null ? "—" : v.toLocaleString("es", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const nombre = id => st.productos[id]?.nombre ?? "—";
 
 function mostrar(d) {
   const e = $("estado");
   if (!d.detectado) {
-    st.ultimo = null; st.suav = null;
-    e.style.background = ""; e.innerHTML = "—<small>Coloque el producto dentro del recuadro</small>";
+    e.style.background = ""; e.innerHTML = "—<small>Buscando producto…</small>";
+    $("reconocido").textContent = "";
     ["v_area", "v_vol", "v_peso", "v_dim", "v_dano", "v_mad", "v_cal"].forEach(id => $(id).textContent = "—");
     return;
   }
-  const r = d.resultados; st.ultimo = r;
+  const r = d.resultados;
   const s = st.suav = st.modo === "camara" ? suavizar(st.suav, r) : { ...r };
+  if (st.producto < 0) {
+    const [id, v] = productoEstable();
+    $("reconocido").textContent = id >= 0 ? `Reconocido automáticamente: ${nombre(id)} (${Math.round(v * 100)} %)`
+                                          : "Reconociendo producto…";
+  } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere: ${nombre(d.reconocido_id)}`;
   e.style.background = COLOR_ESTADO[r.estado] || "";
   e.innerHTML = `${r.estado}<small>${r.producto}</small>`;
   $("v_area").textContent = fmt(s.area_cm2, 1) + " cm²";
@@ -322,26 +377,120 @@ function mostrar(d) {
   $("v_cal").textContent = r.calibre;
 }
 
+// ---------------------------------------------------------------- dibujo con zoom al producto
+function cajaObjetivo(fw, fh) {
+  const d = st.det, ahora = performance.now() / 1000;
+  if (!st.zoom || !d?.detectado || ahora - st.ultimaDet > 1.0) return [0, 0, fw, fh];
+  const [x, y, w, h] = d.caja, A = fw / fh;
+  let bw = w * 2.1, bh = h * 2.1;                      // el producto ocupa ~la mitad de la vista
+  if (bw / bh < A) bw = bh * A; else bh = bw / A;
+  if (bw < fw * 0.3) { bw = fw * 0.3; bh = bw / A; }   // zoom máximo ~3x
+  bw = Math.min(bw, fw); bh = Math.min(bh, fh);
+  const x0 = Math.min(Math.max(x + w / 2 - bw / 2, 0), fw - bw);
+  const y0 = Math.min(Math.max(y + h / 2 - bh / 2, 0), fh - bh);
+  return [x0, y0, bw, bh];
+}
+
+function dibujar() {
+  requestAnimationFrame(dibujar);
+  if (!st.modo) return;
+  const t = tamCuadro(); if (!t) return;
+  const [fw, fh, fuente, kv] = t;
+  const lienzo = $("lienzo");
+  if (lienzo.dataset.prop !== `${fw}/${fh}`) { lienzo.style.aspectRatio = `${fw} / ${fh}`; lienzo.dataset.prop = `${fw}/${fh}`; }
+  const dpr = window.devicePixelRatio || 1, rect = lienzo.getBoundingClientRect();
+  const cw = Math.round(rect.width * dpr), ch = Math.round(rect.height * dpr);
+  if (vista.width !== cw || vista.height !== ch) { vista.width = cw; vista.height = ch; }
+  const c = vista.getContext("2d");
+
+  const obj = cajaObjetivo(fw, fh);
+  st.caja = st.caja ? st.caja.map((v, i) => v + 0.12 * (obj[i] - v)) : obj;     // movimiento suave
+  const [bx, by, bw, bh] = st.caja, k = cw / bw;
+
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = "#000"; c.fillRect(0, 0, cw, ch);
+  if (st.mascara && st.mascaraImg) c.drawImage(st.mascaraImg, bx, by, bw, bh, 0, 0, cw, ch);
+  else c.drawImage(fuente, bx * kv, by * kv, bw * kv, bh * kv, 0, 0, cw, ch);
+
+  // superposición en coordenadas del cuadro
+  const d = st.det;
+  c.setTransform(k, 0, 0, k, -bx * k, -by * k);
+  if (d?.detectado && d.ancho === fw) {
+    const g = 2.5 * dpr / k;
+    const poli = (pts, cerrar = true) => {
+      c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (cerrar) c.closePath();
+    };
+    c.fillStyle = "rgba(255,0,0,.55)";
+    d.danos.forEach(p => { poli(p); c.fill(); });
+    if (st.discos && !st.mascara) {
+      c.strokeStyle = "#ffdc00"; c.lineWidth = g * 0.6;
+      d.discos.forEach(s => { poli(s, false); c.stroke(); });
+      c.strokeStyle = "#00ffff"; poli(d.eje, false); c.stroke();
+    }
+    c.strokeStyle = "#00ff00"; c.lineWidth = g; poli(d.contorno); c.stroke();
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+
+  // minimapa con la vista completa cuando hay zoom
+  if (bw < fw * 0.95) {
+    const mw = cw * 0.24, mh = mw * fh / fw, mx = cw - mw - 10 * dpr, my = ch - mh - 10 * dpr;
+    c.globalAlpha = 0.9; c.drawImage(fuente, 0, 0, fw * kv, fh * kv, mx, my, mw, mh); c.globalAlpha = 1;
+    c.strokeStyle = "rgba(255,255,255,.8)"; c.lineWidth = dpr; c.strokeRect(mx, my, mw, mh);
+    c.strokeStyle = "#ffd15a"; c.lineWidth = 2 * dpr;
+    c.strokeRect(mx + bx / fw * mw, my + by / fh * mh, bw / fw * mw, bh / fh * mh);
+  }
+
+  // indicador de captura automática
+  if (st.autoCap && d?.detectado && st.modo === "camara") {
+    const txt = st.capturando ? "Capturando…" : st.capturada ? "✓ Capturado — ponga otro producto"
+              : st.progreso > 0.05 ? "Manténgalo quieto…" : "Producto detectado";
+    c.font = `600 ${14 * dpr}px system-ui, sans-serif`;
+    const tw = c.measureText(txt).width + 24 * dpr, th = 30 * dpr, x = 10 * dpr, y = 10 * dpr;
+    c.fillStyle = "rgba(0,0,0,.6)"; c.fillRect(x, y, tw, th);
+    if (!st.capturada && !st.capturando) { c.fillStyle = "#ffd15a"; c.fillRect(x, y + th - 4 * dpr, tw * st.progreso, 4 * dpr); }
+    c.fillStyle = st.capturada ? "#3ddc84" : "#fff"; c.fillText(txt, x + 12 * dpr, y + 20 * dpr);
+  }
+}
+requestAnimationFrame(dibujar);
+
 // ---------------------------------------------------------------- acciones
 function hayImagen() {
   if (!st.modo) { aviso("Primero inicie la cámara o suba una foto."); return false; }
   return true;
 }
 
-async function capturar() {
-  if (!hayImagen()) return;
-  aviso("Generando lámina de cálculo…", 8000);
-  const blob = await cuadro();
-  const resp = await fetch("/api/reporte", { method: "POST", body: formulario(blob) });
-  if (!resp.ok) { aviso((await resp.json().catch(() => ({}))).error || "No se pudo generar la lámina."); return; }
-  const r = JSON.parse(resp.headers.get("X-Resultados") || "null");
-  const png = await resp.blob();
-  const marca = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "_");
-  if ($("lamina").src) URL.revokeObjectURL($("lamina").src);
-  $("lamina").src = URL.createObjectURL(png);
-  $("descargar").href = $("lamina").src; $("descargar").download = `reporte_${marca}.png`;
-  $("dlg").showModal(); aviso("Lámina lista.", 1500);
-  if (r) { st.historial.push({ fecha: marca, ...r }); guardarHistorial(); }
+async function capturar(automatica = false) {
+  if (!hayImagen() || st.capturando) return;
+  st.capturando = true;
+  if (!automatica) aviso("Generando lámina de cálculo…", 8000);
+  try {
+    const resp = await fetch("/api/reporte", { method: "POST", body: formulario(await cuadro()) });
+    if (!resp.ok) {
+      if (automatica) st.capturada = null;
+      else aviso((await resp.json().catch(() => ({}))).error || "No se pudo generar la lámina.");
+      return;
+    }
+    const r = JSON.parse(resp.headers.get("X-Resultados") || "null");
+    const url = URL.createObjectURL(await resp.blob());
+    const marca = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "_");
+    st.laminas.set(marca, url);
+    if (st.laminas.size > 30) { const [vieja] = st.laminas.keys(); URL.revokeObjectURL(st.laminas.get(vieja)); st.laminas.delete(vieja); }
+    if (r) { st.historial.push({ fecha: marca, ...r }); guardarHistorial(); }
+    $("ultima").style.display = "flex"; $("ultimaImg").src = url; $("ultima").dataset.fecha = marca;
+    $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³<br>
+      <span style="color:var(--tenue)">${automatica ? "Captura automática" : "Captura manual"} · toque para ver</span>` : "";
+    if (automatica) {
+      aviso(r ? `Captura automática: ${r.producto} · ${r.estado}` : "Captura automática guardada", 2500);
+      $("lienzo").classList.add("destello"); setTimeout(() => $("lienzo").classList.remove("destello"), 600);
+    } else { verLamina(marca); aviso("Lámina lista.", 1500); }
+  } finally { st.capturando = false; }
+}
+
+function verLamina(fecha) {
+  const url = st.laminas.get(fecha);
+  if (!url) { aviso("La lámina de esta captura ya no está en memoria (solo se guardan los datos)."); return; }
+  $("lamina").src = url; $("descargar").href = url; $("descargar").download = `reporte_${fecha}.png`;
+  $("dlg").showModal();
 }
 
 async function calibrar() {
@@ -360,13 +509,15 @@ async function alternarFondo() {
     if (st.modo !== "camara") { aviso("El fondo se captura con la cámara en vivo, sin producto."); return; }
     st.fondo = await cuadro(); aviso("Fondo capturado: ahora ponga el producto.");
   }
-  st.suav = null; marcarBotones();
+  reiniciarPresencia(); marcarBotones();
 }
 
 function marcarBotones() {
   $("btnFondo").classList.toggle("activo", !!st.fondo);
   $("btnDiscos").classList.toggle("activo", st.discos);
   $("btnMascara").classList.toggle("activo", st.mascara);
+  $("btnZoom").classList.toggle("activo", st.zoom);
+  $("btnAuto").classList.toggle("activo", st.autoCap);
 }
 
 function mostrarEscala() {
@@ -376,14 +527,15 @@ function mostrarEscala() {
 }
 
 function elegirProducto(i) {
-  if (i < 0 || i >= st.productos.length) return;
-  st.producto = i; localStorage.producto = i; $("producto").value = i; st.suav = null; analizarUnaVez();
+  if (i < -1 || i >= st.productos.length) return;
+  st.producto = i; localStorage.producto = i; $("producto").value = i;
+  reiniciarPresencia(); analizarUnaVez();
 }
 
 // ---------------------------------------------------------------- historial
 function guardarHistorial() {
   localStorage.historial = JSON.stringify(st.historial);
-  $("tabla").innerHTML = st.historial.slice().reverse().map(h => `<tr>
+  $("tabla").innerHTML = st.historial.slice().reverse().map(h => `<tr class="${st.laminas.has(h.fecha) ? "ver" : ""}" data-fecha="${h.fecha}">
     <td>${h.fecha.slice(9, 11)}:${h.fecha.slice(11, 13)}</td><td>${h.producto}</td>
     <td>${fmt(h.area_cm2, 1)}</td><td>${fmt(h.volumen_cm3, 0)}</td><td>${fmt(h.peso_g, 0)}</td>
     <td>${fmt(h.dano_pct, 1)}%</td><td style="color:${COLOR_ESTADO[h.estado] || "inherit"}">${h.estado}</td></tr>`).join("")
@@ -392,7 +544,7 @@ function guardarHistorial() {
 
 function descargarCsv() {
   if (!st.historial.length) { aviso("No hay capturas."); return; }
-  const cols = ["fecha", "producto", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3", "peso_g",
+  const cols = ["fecha", "producto", "automatico", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3", "peso_g",
                 "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado"];
   const filas = [cols.join(";"), ...st.historial.map(h => cols.map(k => h[k] ?? "").join(";"))];
   const a = document.createElement("a");
@@ -405,23 +557,30 @@ $("btnCamara").onclick = () => st.stream ? detenerCamara() : iniciarCamara();
 $("btnGirar").onclick = () => { st.facing = st.facing === "environment" ? "user" : "environment"; iniciarCamara(); };
 $("archivo").onchange = e => { if (e.target.files[0]) cargarFoto(e.target.files[0]); e.target.value = ""; };
 $("producto").onchange = e => elegirProducto(+e.target.value);
-$("btnCapturar").onclick = capturar;
+$("btnCapturar").onclick = () => capturar(false);
 $("btnCalibrar").onclick = calibrar;
 $("btnFondo").onclick = alternarFondo;
-$("btnDiscos").onclick = () => { st.discos = !st.discos; marcarBotones(); analizarUnaVez(); };
+$("btnDiscos").onclick = () => { st.discos = !st.discos; marcarBotones(); };
 $("btnMascara").onclick = () => { st.mascara = !st.mascara; marcarBotones(); analizarUnaVez(); };
+$("btnZoom").onclick = () => { st.zoom = !st.zoom; marcarBotones(); };
+$("btnAuto").onclick = () => { st.autoCap = !st.autoCap; st.capturada = null; marcarBotones();
+                               aviso(st.autoCap ? "Captura automática activada." : "Captura automática desactivada."); };
 $("btnOlvidar").onclick = () => { localStorage.removeItem("px_por_cm"); st.px = PX_DEFECTO; st.calibrado = false; mostrarEscala(); analizarUnaVez(); };
 $("btnCsv").onclick = descargarCsv;
 $("btnBorrar").onclick = () => { st.historial = []; guardarHistorial(); };
 $("cerrar").onclick = () => $("dlg").close();
-for (const [id, clave, txt] of [["smin", "sMin", "t_smin"], ["vosc", "vOsc", "t_vosc"]])
-  $(id).oninput = e => { st[clave] = +e.target.value; $(txt).textContent = e.target.value; analizarUnaVez(); };
+$("ultima").onclick = () => verLamina($("ultima").dataset.fecha);
+$("tabla").onclick = e => { const tr = e.target.closest("tr.ver"); if (tr) verLamina(tr.dataset.fecha); };
+$("sens").oninput = e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; analizarUnaVez(); };
 
 document.addEventListener("keydown", e => {
   if (e.target.matches("input, select, textarea") || e.ctrlKey || e.metaKey || e.altKey || $("dlg").open) return;
   const k = e.key.toLowerCase();
-  if (k >= "1" && k <= "9") elegirProducto(+k - 1);
-  else if (k === "c" || k === " ") { e.preventDefault(); capturar(); }
+  if (k === "0") elegirProducto(-1);
+  else if (k >= "1" && k <= "9") elegirProducto(+k - 1);
+  else if (k === "c" || k === " ") { e.preventDefault(); capturar(false); }
+  else if (k === "a") $("btnAuto").click();
+  else if (k === "z") $("btnZoom").click();
   else if (k === "k") calibrar();
   else if (k === "b") alternarFondo();
   else if (k === "d") $("btnDiscos").click();
@@ -431,8 +590,9 @@ document.addEventListener("keydown", e => {
 (async () => {
   mostrarEscala(); guardarHistorial(); marcarBotones();
   st.productos = await (await fetch("/api/productos")).json();
-  $("producto").innerHTML = st.productos.map(p => `<option value="${p.id}">${p.id + 1}. ${p.nombre}</option>`).join("");
-  if (st.producto >= st.productos.length) st.producto = 0;
+  $("producto").innerHTML = `<option value="-1">Automático (reconocer)</option>` +
+    st.productos.map(p => `<option value="${p.id}">${p.id + 1}. ${p.nombre}</option>`).join("");
+  if (st.producto >= st.productos.length || st.producto < -1 || Number.isNaN(st.producto)) st.producto = -1;
   $("producto").value = st.producto;
 })();
 </script>

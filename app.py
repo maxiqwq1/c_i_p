@@ -46,22 +46,23 @@ def parametros():
     if fondo is not None and fondo.shape != frame.shape:
         fondo = cv2.resize(fondo, (frame.shape[1], frame.shape[0]))
     f = request.form
-    i = min(max(int(f.get("producto", 0)), 0), len(PRODUCTOS) - 1)
-    H, W = frame.shape[:2]
+    i = int(f.get("producto", -1))                    # -1 = reconocer automáticamente
     return {
-        "frame": frame, "fondo": fondo, "producto": PRODUCTOS[i],
+        "frame": frame, "fondo": fondo,
+        "producto": PRODUCTOS[i] if 0 <= i < len(PRODUCTOS) else None,
         "px_por_cm": max(float(f.get("px_por_cm", 12.0)), 0.1),
-        "s_min": int(f.get("s_min", 60)), "v_osc": int(f.get("v_osc", 70)),
-        "roi": (int(W * 0.06), int(H * 0.06), int(W * 0.94), int(H * 0.94)),
+        "sensibilidad": int(f.get("sensibilidad", 50)),
     }
 
 
 def analizar(p):
     try:
-        return vision.analizar(p["frame"], p["producto"], p["px_por_cm"], p["fondo"],
-                               p["roi"], p["s_min"], p["v_osc"])
+        r = vision.analizar(p["frame"], p["producto"], p["px_por_cm"], p["fondo"], p["sensibilidad"])
     except cv2.error:
         return None
+    if r is not None and request.form.get("auto") == "1":
+        r["automatico"] = True      # la página eligió el producto por votación del reconocimiento
+    return r
 
 
 def poligono(contorno, tolerancia=1.5):
@@ -79,6 +80,7 @@ def resumen(r):
         "diametro_cm": numero(r["diametro_cm"], 2), "area_dano_cm2": numero(r["area_dano_cm2"], 2),
         "dano_pct": numero(r["dano_pct"], 1), "madurez_pct": numero(r["madurez_pct"], 1),
         "calibre": r["calibre"], "estado": r["estado"], "producto": r["producto"],
+        "producto_id": r["producto_id"], "automatico": r["automatico"],
     }
 
 
@@ -112,13 +114,12 @@ def api_analizar():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     H, W = p["frame"].shape[:2]
-    salida = {"ancho": W, "alto": H, "roi": p["roi"], "detectado": False}
-
-    if request.form.get("mascara") == "1":
-        masc, _ = vision.segmentar(p["frame"], p["fondo"], p["roi"], p["s_min"], p["v_osc"])
-        salida["mascara"] = jpeg_data_url(masc if masc is not None else np.zeros((H, W), np.uint8))
+    salida = {"ancho": W, "alto": H, "detectado": False}
 
     r = analizar(p)
+    if request.form.get("mascara") == "1":
+        masc = r["mascara"] if r is not None else None
+        salida["mascara"] = jpeg_data_url(masc if masc is not None else np.zeros((H, W), np.uint8))
     if r is not None:
         dano_c, _ = cv2.findContours(r["dano"], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         discos, eje = vision.geometria(r)
@@ -127,6 +128,8 @@ def api_analizar():
             "contorno": poligono(r["contorno"]),
             "danos": [poligono(c, 1.0) for c in dano_c if len(c) >= 3],
             "discos": discos, "eje": eje,
+            "caja": list(cv2.boundingRect(r["contorno"])),          # para el zoom al producto
+            "reconocido_id": r["reconocido_id"], "reconocimiento": r["reconocimiento"],
         })
     return jsonify(salida)
 
@@ -138,9 +141,9 @@ def api_calibrar():
         p = parametros()
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    _, cont = vision.segmentar(p["frame"], p["fondo"], p["roi"], p["s_min"], p["v_osc"])
+    _, cont = vision.segmentar(p["frame"], p["fondo"], p["sensibilidad"])
     if cont is None:
-        return jsonify({"ok": False, "mensaje": "No se detectó la tarjeta. Póngala sola dentro del recuadro."})
+        return jsonify({"ok": False, "mensaje": "No se detectó la tarjeta. Póngala sola frente a la cámara."})
     (_, _), (w, h), _ = cv2.minAreaRect(cont)
     lado = max(w, h)
     return jsonify({"ok": True, "px_por_cm": lado / REFERENCIA_CM, "lado_px": lado})
@@ -156,7 +159,7 @@ def api_reporte():
     r = analizar(p)
     if r is None:
         return jsonify({"error": "No hay producto detectado para capturar."}), 422
-    vista = vision.anotar(p["frame"], r)
+    vista = vision.anotar(p["frame"], r)       # reporte.generar hace el zoom al producto
     buf = io.BytesIO()
     reporte.generar(vista, r, buf)
     buf.seek(0)

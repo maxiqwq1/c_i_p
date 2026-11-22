@@ -13,6 +13,12 @@ La cámara del PC observa el producto (por ahora frutas) y el programa calcula:
 
 Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre.
 
+Todo es **automático**:
+- **Detección en cualquier lugar**: no hace falta recuadro guía ni hoja blanca. El programa aprende los colores del fondo a partir del borde de la imagen y elige la región que más parece un producto (tamaño razonable, forma compacta, que no toque el borde). Ignora sombras, lápices y objetos cortados.
+- **Reconocimiento del producto** por color, forma (largo/diámetro) y viveza del color, con votación entre cuadros para que no salte. Si ningún perfil coincide, usa *Genérico*. Se puede elegir a mano.
+- **Captura automática**: cuando el producto se queda quieto ~1 s se guarda la captura y la lámina; vuelve a capturar al poner otro producto.
+- **Zoom al producto**: la vista se acerca a la fruta (con un minimapa de la vista completa) y la foto de la lámina también.
+
 ## Cómo ejecutarlo (VS Code)
 1. Abra esta carpeta en VS Code.
 2. Pulse **F5** (o el menú *Ejecutar y depurar*) y elija:
@@ -31,27 +37,28 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
 
 ## Recomendaciones para la cámara real
-- Fondo **claro y liso** (una hoja blanca) y buena luz, sin sombras fuertes.
-- Calibre la escala una vez: ponga **sola** una tarjeta de color (carnet o tarjeta de crédito, 8.56 cm) en el recuadro y pulse **K**. Se guarda en `calibracion.json`. Si cambia la altura de la cámara, vuelva a calibrar.
-- Para productos pálidos (papa, cebolla), pulse **B** con el fondo vacío y luego ponga el producto.
-- Si la detección falla, pulse **M** para ver la máscara y mueva las barras *Saturacion min* / *Oscuro max*.
+- Un fondo de color **distinto** al producto (mesa, mantel u hoja) y buena luz. Que el producto no toque el borde de la imagen.
+- Calibre la escala una vez: ponga **sola** una tarjeta de color (carnet o tarjeta de crédito, 8.56 cm) frente a la cámara, a la misma distancia que las frutas, y pulse **K**. Se guarda en `calibracion.json`. Si cambia la altura de la cámara, vuelva a calibrar.
+- Para productos de color parecido al fondo (papa sobre madera, cebolla sobre hoja), pulse **B** con la escena vacía y luego ponga el producto.
+- Si la detección falla, pulse **M** para ver la máscara y mueva la barra *Sensibilidad* (más alta = detecta productos más pálidos; más baja = ignora más sombras).
 
 ## Teclas
-`1-6` producto · `C`/`Espacio` capturar · `K` calibrar · `B` fondo · `D` discos · `M` máscara · `Q`/`Esc` salir
+`0` reconocer automáticamente · `1-6` elegir producto · `A` captura automática · `Z` zoom · `C`/`Espacio` capturar a mano · `K` calibrar · `B` fondo · `D` discos · `M` máscara · `Q`/`Esc` salir
 
 Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D y convergencia de Riemann) y una fila en `resultados.csv` (se abre con Excel).
 
 ## Agregar otros productos
-Edite `productos.py` y agregue una ficha (densidad, color de madurez, umbrales y calibres). El cálculo de áreas y volúmenes es el mismo para cualquier producto.
+Edite `productos.py` y agregue una ficha (densidad, color de madurez, umbrales, calibres y el perfil de reconocimiento: colores típicos, alargamiento y saturación). El cálculo de áreas y volúmenes es el mismo para cualquier producto.
 
 ## Limitaciones (para mencionar en el informe)
 - El método de discos supone que el producto es **simétrico alrededor de su eje mayor**. Funciona bien con naranja, tomate, limón, manzana o mango, y mal con banano.
 - La cámara ve una proyección 2D. La silueta está un poco más cerca de la cámara que la hoja, así que la escala tiene un pequeño error de perspectiva.
+- El reconocimiento usa reglas de color y forma (ver el perfil de cada ficha en `productos.py`), no inteligencia artificial: puede confundir productos del mismo color y forma, como **tomate y manzana roja**. En ese caso elija el producto a mano.
 - Densidades aproximadas: para mejorar el peso estimado hay que pesar algunas frutas reales y ajustar la densidad en `productos.py`.
 
 ## Archivos
 - `calculo.py`: las integrales (área, volumen y sumas de Riemann)
-- `vision.py`: segmentación, alineación del eje, manchas, madurez y clasificación
+- `vision.py`: detección automática, reconocimiento, alineación del eje, manchas, madurez y clasificación
 - `camara.py`: aplicación en vivo
 - `reporte.py`: lámina de gráficas
 - `demo_sintetica.py`: simulación de validación
