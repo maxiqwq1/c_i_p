@@ -1,0 +1,5 @@
+# Aplicación de escritorio con ventana (camara.py) y simulación (demo_sintetica.py)
+opencv-python
+numpy
+matplotlib
+pillow

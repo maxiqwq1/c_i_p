@@ -87,28 +87,9 @@ def abrir_camara(indice):
 
 
 def dibujar(frame, r, producto, px_por_cm, calibrado, roi, ver_discos, fondo_activo, suav):
-    vista = frame.copy()
+    vista = frame.copy() if r is None else vision.anotar(frame, r, ver_discos)
     x0, y0, x1, y1 = roi
     cv2.rectangle(vista, (x0, y0), (x1, y1), (200, 200, 200), 1)
-
-    if r is not None:
-        # manchas en rojo
-        capa = vista.copy()
-        capa[r["dano"] > 0] = (0, 0, 255)
-        vista = cv2.addWeighted(capa, 0.55, vista, 0.45, 0)
-        cv2.drawContours(vista, [r["contorno"]], -1, (0, 255, 0), 2)
-
-        if ver_discos:
-            cols, sup, inf = r["columnas"], r["fila_sup"], r["fila_inf"]
-            idx = np.linspace(0, len(cols) - 1, 18).astype(int)[1:-1]
-            for i in idx:
-                p = vision.a_imagen([(cols[i] + 0.5, sup[i]), (cols[i] + 0.5, inf[i] + 1)],
-                                    r["Minv"], r["desplazamiento"]).astype(int)
-                cv2.line(vista, tuple(p[0]), tuple(p[1]), (0, 220, 255), 1)
-            fila_eje = np.median((sup + inf + 1) / 2)
-            p = vision.a_imagen([(cols[0], fila_eje), (cols[-1] + 1, fila_eje)],
-                                r["Minv"], r["desplazamiento"]).astype(int)
-            cv2.line(vista, tuple(p[0]), tuple(p[1]), (255, 255, 0), 1, cv2.LINE_AA)
 
     # panel lateral de resultados (no tapa el video)
     H = vista.shape[0]

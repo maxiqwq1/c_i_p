@@ -84,6 +84,40 @@ def a_imagen(puntos, Minv, desplazamiento):
     return orig
 
 
+def geometria(r, n_discos=16):
+    """
+    Segmentos para dibujar sobre el video: n_discos líneas verticales (los discos
+    del método de discos) y el eje de revolución, en coordenadas de la imagen.
+    """
+    cols, sup, inf = r["columnas"], r["fila_sup"], r["fila_inf"]
+    idx = np.linspace(0, len(cols) - 1, n_discos + 2).astype(int)[1:-1]
+    discos = [_a_lista(a_imagen([(cols[i] + 0.5, sup[i]), (cols[i] + 0.5, inf[i] + 1)],
+                                      r["Minv"], r["desplazamiento"])) for i in idx]
+    fila_eje = np.median((sup + inf + 1) / 2)
+    eje = _a_lista(a_imagen([(cols[0], fila_eje), (cols[-1] + 1, fila_eje)],
+                                  r["Minv"], r["desplazamiento"]))
+    return discos, eje
+
+
+def _a_lista(puntos):
+    return [[int(round(x)), int(round(y))] for x, y in puntos]
+
+
+def anotar(frame, r, ver_discos=True):
+    """Dibuja sobre una copia del cuadro: manchas en rojo, contorno verde, discos y eje."""
+    vista = frame.copy()
+    capa = vista.copy()
+    capa[r["dano"] > 0] = (0, 0, 255)
+    vista = cv2.addWeighted(capa, 0.55, vista, 0.45, 0)
+    cv2.drawContours(vista, [r["contorno"]], -1, (0, 255, 0), 2)
+    if ver_discos:
+        discos, eje = geometria(r)
+        for p0, p1 in discos:
+            cv2.line(vista, tuple(p0), tuple(p1), (0, 220, 255), 1)
+        cv2.line(vista, tuple(eje[0]), tuple(eje[1]), (255, 255, 0), 1, cv2.LINE_AA)
+    return vista
+
+
 def detectar_danos(frame, mascara, producto):
     """Manchas = píxeles del interior mucho más oscuros que el brillo típico del producto."""
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)

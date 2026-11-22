@@ -1,4 +1,7 @@
-opencv-python
+# Versión web (Railway). OpenCV "headless": el servidor no tiene pantalla.
+flask
+gunicorn
+opencv-python-headless
 numpy
 matplotlib
 pillow
