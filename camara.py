@@ -4,7 +4,7 @@ INSPECCIÓN EN VIVO CON LA CÁMARA DEL PC
 Apunte la cámara al producto: se detecta solo, en cualquier parte de la
 imagen y sobre cualquier fondo liso o de un color distinto al producto
 (mesa, mantel, hoja...). El programa:
-  - reconoce qué producto es, fruta o verdura (o elíjalo a mano con 1-9 / N / P),
+  - reconoce qué fruta es (o elíjala a mano con 1-9 / N / P),
   - hace zoom sobre él,
   - calcula en tiempo real área (∫(f−g)dx), volumen (π∫r²dx), peso, % de daño,
     madurez y estado,
@@ -96,7 +96,7 @@ def cargar_ejemplos():
     ejemplos = []
     for e in datos if isinstance(datos, list) else []:
         try:
-            i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
+            i = por_nombre.get(e["nombre"], -1) if e.get("nombre") else int(e["producto"])   # nombre quitado (verdura) => -1, se descarta
             if 0 <= i < len(PRODUCTOS) and len(e["rasgos"]["hist"]) == 18:
                 ejemplos.append({**e, "producto": i})
         except (KeyError, TypeError, ValueError, AttributeError):
@@ -132,6 +132,7 @@ class Seguimiento:
     """
 
     def __init__(self):
+        self.caja_det = None          # caja del producto estabilizada (para el zoom); el zoom la ignora si se fue
         self.reiniciar()
         self.ultima_det = 0.0
 
@@ -145,26 +146,49 @@ class Seguimiento:
         return (i, self.votos[i]) if self.votos[i] >= 0.6 else (None, self.votos[i])
 
     def sin_producto(self, ahora):
-        if ahora - self.ultima_det > 1.0:
+        if ahora - self.ultima_det > 1.5:
             self.reiniciar()
+
+    def estabilizar_caja(self, rect):
+        """
+        La silueta cambia unos píxeles en cada cuadro aunque el producto esté quieto; si el
+        zoom la siguiera tal cual, la imagen temblaría. Zona muerta: los cambios pequeños se
+        ignoran, los medianos se siguen poco a poco y un salto grande (otro producto) de inmediato.
+        """
+        nueva = np.array(rect, float)
+        p = self.caja_det
+        if p is None:
+            self.caja_det = nueva
+            return
+        x, y, w, h = nueva
+        px, py, pw, ph = p
+        mov = np.hypot(x + w / 2 - (px + pw / 2), y + h / 2 - (py + ph / 2)) / max(pw, ph, 1.0)
+        esc = abs(np.log(max(w * h, 1.0) / max(pw * ph, 1.0)))
+        if mov < 0.12 and esc < 0.2:
+            return                                  # temblor de la detección: quieto
+        a = 1.0 if (mov > 0.6 or esc > 0.7) else 0.35
+        self.caja_det = p + a * (nueva - p)
 
     def actualizar(self, r, forma, ahora, producto_fijo):
         """Registra una detección; devuelve True si toca capturar automáticamente."""
         self.ultima_det = ahora
+        # votación: hacen falta ~6 cuadros parecidos para decidir o cambiar de producto
         for i in self.votos:
-            self.votos[i] *= 0.7
-        self.votos[r["reconocido_id"]] = self.votos.get(r["reconocido_id"], 0) + 0.3
+            self.votos[i] *= 0.85
+        self.votos[r["reconocido_id"]] = self.votos.get(r["reconocido_id"], 0) + 0.15
 
         x, y, w, h = cv2.boundingRect(r["contorno"])
+        self.estabilizar_caja((x, y, w, h))
         m = (ahora, r["area_cm2"], (x + w / 2) / forma[1], (y + h / 2) / forma[0])
         self.muestras = [s for s in self.muestras if ahora - s[0] < 3] + [m]
         c = self.capturada
         if c and (abs(m[1] - c[1]) / c[1] > 0.3 or np.hypot(m[2] - c[2], m[3] - c[3]) > 0.15):
             self.reiniciar()                       # otro producto en el mismo lugar
             self.muestras = [m]
+            self.estabilizar_caja((x, y, w, h))
         desde = ahora
         for s in reversed(self.muestras):
-            if abs(s[1] - m[1]) / m[1] > 0.04 or np.hypot(s[2] - m[2], s[3] - m[3]) > 0.03:
+            if abs(s[1] - m[1]) / m[1] > 0.06 or np.hypot(s[2] - m[2], s[3] - m[3]) > 0.035:
                 break
             desde = s[0]
         self.progreso = min(1.0, (ahora - desde) / T_QUIETO)
@@ -176,16 +200,24 @@ class Seguimiento:
 
 
 # ---------------------------------------------------------------- dibujo
-def caja_objetivo(r, forma, zoom):
+def caja_objetivo(rect, forma, zoom):
+    """Vista a mostrar (x0, y0, x1, y1) alrededor de la caja ESTABILIZADA del producto."""
     H, W = forma[:2]
-    if not zoom or r is None:
+    if not zoom or rect is None:
         return np.array([0, 0, W, H], float)
-    x0, y0, x1, y1 = vision.caja_enfoque(r["contorno"], forma, margen=0.55, proporcion=W / H)
-    if x1 - x0 < 0.3 * W:                      # zoom máximo ~3x
-        cx, cy, w = (x0 + x1) / 2, (y0 + y1) / 2, 0.3 * W
-        x0, x1 = np.clip([cx - w / 2, cx + w / 2], 0, W)
-        y0, y1 = np.clip([cy - w * H / W / 2, cy + w * H / W / 2], 0, H)
-    return np.array([x0, y0, x1, y1], float)
+    x, y, w, h = rect
+    A = W / H
+    bw, bh = w * 2.5, h * 2.5                  # el producto ocupa ~40 % de la vista
+    if bw / bh < A:
+        bw = bh * A
+    else:
+        bh = bw / A
+    if bw < 0.5 * W:                           # zoom máximo ~2x: más aumento, más temblor
+        bw, bh = 0.5 * W, 0.5 * W / A
+    bw, bh = min(bw, W), min(bh, H)
+    x0 = float(np.clip(x + w / 2 - bw / 2, 0, W - bw))
+    y0 = float(np.clip(y + h / 2 - bh / 2, 0, H - bh))
+    return np.array([x0, y0, x0 + bw, y0 + bh], float)
 
 
 def aplicar_zoom(img, caja, original):
@@ -244,13 +276,13 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
              f"Largo × diámetro = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"),
             f"Daño = {suav['dano_pct']:.1f} %",
             f"Madurez = {mad}",
-            f"Calibre: {r['calibre']}",
+            f"Calibre: {suav['calibre']}",
         ]
         for i, t in enumerate(lineas):
             textos.append((t, (18, y + i * 31), 21, blanco))
-        color = COLOR_ESTADO.get(r["estado"], (90, 90, 90))
+        color = COLOR_ESTADO.get(suav["estado"], (90, 90, 90))
         cv2.rectangle(p, (18, y + 228), (18 + 240, y + 274), color, -1)
-        textos.append((r["estado"], (32, y + 232), 28, blanco))
+        textos.append((suav["estado"], (32, y + 232), 28, blanco))
     y = 380
     escala = f"Escala: {px_por_cm:.1f} px/cm" + ("" if calibrado else "  (SIN CALIBRAR: K)")
     textos.append((escala, (18, y), 17, gris if calibrado else (60, 120, 255)))
@@ -265,15 +297,26 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
     return escribir(p, textos)
 
 
-def suavizar(prev, r, alfa=0.3):
+def suavizar(prev, r, alfa=0.25, n=7):
+    """
+    Medidas estables: mediana de las últimas n lecturas (descarta cuadros raros, p. ej. una
+    sombra que agrandó la silueta) y luego un promedio suave para que los números no salten.
+    El estado y el calibre son los más repetidos en esas lecturas (no cambian por un cuadro).
+    """
     claves = ("area_cm2", "volumen_cm3", "peso_g", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct")
-    nuevo = {}
+    lectura = {k: r[k] for k in claves + ("estado", "calibre")}
+    lecturas = ((prev or {}).get("_lecturas", []) + [lectura])[-n:]
+    nuevo = {"_lecturas": lecturas}
     for k in claves:
-        v = r[k]
-        if prev is None or prev.get(k) is None or v is None:
-            nuevo[k] = v
+        vals = [x[k] for x in lecturas if x[k] is not None]
+        med = float(np.median(vals)) if vals else None
+        if prev is None or prev.get(k) is None or med is None:
+            nuevo[k] = med
         else:
-            nuevo[k] = alfa * v + (1 - alfa) * prev[k]
+            nuevo[k] = alfa * med + (1 - alfa) * prev[k]
+    for k in ("estado", "calibre"):
+        vals = [x[k] for x in lecturas]
+        nuevo[k] = max(reversed(vals), key=vals.count)     # empate: el más reciente
     return nuevo
 
 
@@ -315,7 +358,7 @@ def main():
     producto_fijo = None                  # None = reconocer automáticamente
     fondo = None
     ver_discos, ver_mascara, auto, zoom = True, False, True, True
-    suav, caja, ultimo_r = None, None, None
+    suav, caja, ultimo_r, t_ant = None, None, None, time.monotonic()
     seg = Seguimiento()
     ejemplos = cargar_ejemplos()
 
@@ -343,13 +386,20 @@ def main():
             r = vision.analizar(frame, prod, px_por_cm, fondo, sens, calibrado, ejemplos)
         except cv2.error:
             r = None
+        capturar_ya = False
         if r is not None:
             r["automatico"] = producto_fijo is None
             suav = suavizar(suav, r)
             capturar_ya = seg.actualizar(r, frame.shape, ahora, producto_fijo)
+            ultimo_r = r
         else:
-            suav, capturar_ya = None, False
             seg.sin_producto(ahora)
+            if ultimo_r is not None and suav is not None and ahora - seg.ultima_det < 0.6:
+                r = ultimo_r          # se perdió un cuadro: se sostiene la última detección (sin parpadeo)
+            else:
+                ultimo_r = None
+                if ahora - seg.ultima_det > 1.5:
+                    suav = None       # se retiró el producto: las medidas empiezan de cero
 
         # vista: anotaciones + zoom suave al producto
         if ver_mascara:
@@ -357,11 +407,12 @@ def main():
             base = cv2.cvtColor(m, cv2.COLOR_GRAY2BGR)
         else:
             base = vision.anotar(frame, r, ver_discos) if r is not None else frame.copy()
-        if r is not None:
-            ultimo_r = r
-        reciente = r if r is not None else (ultimo_r if ahora - seg.ultima_det < 1.0 else None)
-        objetivo = caja_objetivo(reciente, frame.shape, zoom)
-        caja = objetivo if caja is None else caja + 0.25 * (objetivo - caja)
+        # zoom: sigue la caja ESTABILIZADA (no la de cada cuadro), con transición suave por tiempo (~0.45 s)
+        rect = seg.caja_det if ahora - seg.ultima_det < 1.5 else None
+        objetivo = caja_objetivo(rect, frame.shape, zoom)
+        fr = 1 - np.exp(-min(0.1, ahora - t_ant) / 0.45)
+        t_ant = ahora
+        caja = objetivo if caja is None else caja + fr * (objetivo - caja)
         vista = aplicar_zoom(base, caja, base)
         if r is not None:
             vista = indicador(vista, seg, auto, capturar_ya and auto)

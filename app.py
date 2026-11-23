@@ -70,7 +70,7 @@ def leer_ejemplos(texto, maximo=300):
     for e in datos[:maximo] if isinstance(datos, list) else []:
         try:
             # el nombre manda (si se agregan productos, los índices cambian); el índice es respaldo
-            i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
+            i = por_nombre.get(e["nombre"], -1) if e.get("nombre") else int(e["producto"])   # nombre quitado (verdura) => -1, se descarta
             r = e["rasgos"]
             rasgos = {"hist": [float(v) for v in r["hist"]], "calibrado": bool(r.get("calibrado")),
                       **{k: float(r[k]) for k in ("palidez", "sat", "val", "alarg", "diam_cm")}}

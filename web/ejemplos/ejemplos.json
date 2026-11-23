@@ -67,67 +67,11 @@
    "medida": "largo"
   },
   {
-   "clave": "papa",
-   "nombre": "Papa",
-   "foto": "papa.jpg",
-   "px_por_cm": 39.22,
-   "largo_cm": 9.0,
-   "medida": "largo"
-  },
-  {
-   "clave": "zanahoria",
-   "nombre": "Zanahoria",
-   "foto": "zanahoria.jpg",
-   "px_por_cm": 24.0,
-   "largo_cm": 17.0,
-   "medida": "largo"
-  },
-  {
-   "clave": "cebolla",
-   "nombre": "Cebolla",
-   "foto": "cebolla.jpg",
-   "px_por_cm": 34.94,
-   "largo_cm": 8.5,
-   "medida": "largo"
-  },
-  {
-   "clave": "pepino",
-   "nombre": "Pepino",
-   "foto": "pepino.jpg",
-   "px_por_cm": 20.07,
-   "largo_cm": 21.0,
-   "medida": "largo"
-  },
-  {
-   "clave": "pimiento",
-   "nombre": "Pimiento",
-   "foto": "pimiento.jpg",
-   "px_por_cm": 30.74,
-   "largo_cm": 9.5,
-   "medida": "largo"
-  },
-  {
-   "clave": "espinaca",
-   "nombre": "Espinaca",
-   "foto": "espinaca.jpg",
-   "px_por_cm": 16.18,
-   "largo_cm": 22.0,
-   "medida": "largo"
-  },
-  {
    "clave": "pera",
    "nombre": "Pera",
    "foto": "pera.jpg",
    "px_por_cm": 28.0,
    "largo_cm": 10.5,
-   "medida": "largo"
-  },
-  {
-   "clave": "repollo",
-   "nombre": "Repollo",
-   "foto": "repollo.jpg",
-   "px_por_cm": 19.18,
-   "largo_cm": 17.0,
    "medida": "largo"
   }
  ]
