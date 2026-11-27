@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b100e">
-<meta name="description" content="Inspección de frutas y verduras con la cámara: área, volumen, daño y madurez calculados con cálculo integral.">
+<meta name="description" content="Inspección de frutas con la cámara: área, volumen, daño y madurez calculados con cálculo integral.">
 <title>Inspección agrícola · Cálculo Integral</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234fd38a'/%3E%3Cpath d='M19.5 7.2c-2.3-1-4.3.2-4.8 2.7l-2.6 12.6c-.5 2.4-2.6 3.3-4.6 2.3' fill='none' stroke='%23062012' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
@@ -381,7 +381,7 @@
             </g>
             <path d="M10 40h100" stroke="#5bd0f0" stroke-width="1.6" stroke-dasharray="4 4"/>
           </svg>
-          <h2>Apunte la cámara a una fruta o verdura</h2>
+          <h2>Apunte la cámara a una fruta</h2>
           <p>El programa la encuentra sola, la reconoce y calcula su área y su volumen con integrales.</p>
           <ol class="pasos">
             <li><span class="n">1</span>Póngala sobre un fondo de otro color, con buena luz.</li>
@@ -491,13 +491,13 @@
           <label class="rango">Sensibilidad <output id="t_sens">50</output><input id="sens" type="range" min="0" max="100" value="50"></label>
           <p class="nota">Súbala si no detecta productos pálidos; bájela si toma sombras u otros objetos.</p>
           <div class="fila"><button id="btnFondo" class="btn pequeno"><svg class="i"><use href="#i-capas"/></svg><span id="txtFondo">Capturar fondo vacío</span> <kbd>B</kbd></button></div>
-          <p class="nota">Para productos del mismo color que el fondo (cebolla blanca sobre hoja blanca): con la escena vacía pulse <b>Capturar fondo vacío</b> y luego ponga el producto.</p>
+          <p class="nota">Para productos del mismo color que el fondo (por ejemplo, una manzana verde sobre un mantel verde): con la escena vacía pulse <b>Capturar fondo vacío</b> y luego ponga el producto.</p>
         </div>
       </details>
       <details class="plegable">
         <summary><svg class="i"><use href="#i-chispa"/></svg>Enseñar al reconocedor<span id="ejResumen" class="resumen"></span></summary>
         <div class="cuerpo">
-          <p class="nota">Ya viene entrenado con las fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button>. Si con su cámara confunde productos, póngalo frente a ella, elija qué es y pulse <b>Guardar ejemplo</b>: con 2-3 ejemplos de cada uno aprende sus productos y su luz.</p>
+          <p class="nota">Ya viene entrenado con las fotos de frutas de la <button class="enlace" data-ver-tabla>tabla de colores</button>. Si con su cámara confunde productos, póngalo frente a ella, elija qué es y pulse <b>Guardar ejemplo</b>: con 2-3 ejemplos de cada uno aprende sus productos y su luz.</p>
           <div class="ensenar">
             <select id="ensenarProd" aria-label="Producto a enseñar"></select>
             <button id="btnEnsenar" class="btn pequeno">Guardar ejemplo <kbd>E</kbd></button>
@@ -560,9 +560,8 @@
       <article><h3>4. Productos curvos (banano)</h3><p class="f">L = ∫ √(1 + c′(x)²) dx,  V = π ∫ r⊥(s)² ds</p><p>El eje es la línea media c(x) = (f + g)/2; el largo es su longitud de arco y los discos van perpendiculares a la curva.</p></article>
       <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
       <article><h3>6. Daño y madurez</h3><p class="f">A_daño ≈ Σ ΔA</p><p>El daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
-      <article><h3>7. Hojas (espinaca)</h3><p class="f">V = e · A = e ∫ₐᵇ [f(x) − g(x)] dx</p><p>Una hoja no es un sólido de revolución sino una lámina delgada: su volumen es el área entre curvas por el grosor e (0.5 mm).</p></article>
-      <article><h3>8. ¿Qué producto es?</h3><p>Cada fruta y verdura tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
-      <article><h3>9. Segunda opinión (red neuronal)</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle dice si se ve fresco o podrido. Es independiente del cálculo: si no coinciden, conviene revisar el producto. El estado lo sigue decidiendo el área dañada.</p></article>
+      <article><h3>7. ¿Qué producto es?</h3><p>Cada fruta tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de frutas de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
+      <article><h3>8. Segunda opinión (red neuronal)</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle dice si se ve fresco o podrido. Es independiente del cálculo: si no coinciden, conviene revisar el producto. El estado lo sigue decidiendo el área dañada.</p></article>
     </div>
   </div>
 </dialog>
@@ -576,8 +575,8 @@
     <figure class="tabla-fig" style="margin:0">
       <img src="/ejemplos/tabla-colores.jpg" width="1536" height="1024" loading="lazy"
            alt="Tabla de configuración de colores en frutas y verduras: 16 productos con su foto y sus 4 colores típicos">
-      <figcaption>De esta tabla salen los productos (14 de los 16: el tomate y el aguacate no se incluyen), la paleta de
-        4 colores de cada uno y las fotos de ejemplo con que se entrena el reconocimiento (entrenar_tabla.py). Toque un producto de la galería para analizar su foto.</figcaption>
+      <figcaption>De esta tabla salen las frutas (el tomate y el aguacate no se incluyen), la paleta de 4 colores de cada
+        una y las fotos de ejemplo con que se entrena el reconocimiento (entrenar_tabla.py). Toque un producto de la galería para analizar su foto.</figcaption>
     </figure>
   </div>
 </dialog>
@@ -602,6 +601,7 @@ const st = {
   modo: null, stream: null, facing: "environment", suav: null,
   det: null, mascaraImg: null, ultimaDet: 0, caja: null,
   votos: {}, muestras: [], progreso: 0, capturada: null, capturando: false,
+  lecturas: [], cajaDet: null, tDibujo: 0,        // estabilización (medidas y zoom)
   historial: JSON.parse(localStorage.historial || "[]"), laminas: new Map(),
   ejemplos: JSON.parse(localStorage.ejemplos || "[]"),
 };
@@ -739,6 +739,8 @@ async function analizar() {
   const resp = await fetch("/api/analizar", { method: "POST", body: formulario(blob, { mascara: st.mascara ? 1 : 0 }) });
   if (!resp.ok) throw new Error((await resp.json()).error || resp.statusText);
   const d = await resp.json();
+  // se perdió un cuadro suelto: se sostiene la última detección (sin parpadeo del contorno ni de los números)
+  if (st.modo === "camara" && !d.detectado && st.det?.detectado && performance.now() / 1000 - st.ultimaDet < 0.6) return;
   if (d.mascara) { const im = new Image(); im.onload = () => st.mascaraImg = im; im.src = d.mascara; } else st.mascaraImg = null;
   st.det = d;
   procesar(d);
@@ -760,20 +762,42 @@ function analizarUnaVez() {
 }
 
 // ---------------------------------------------------------------- reconocimiento y captura automática
-function reiniciarPresencia() { st.votos = {}; st.muestras = []; st.progreso = 0; st.capturada = null; st.suav = null; st.redSuav = null; }
+function reiniciarPresencia() {
+  st.votos = {}; st.muestras = []; st.progreso = 0; st.capturada = null; st.suav = null; st.redSuav = null;
+  st.lecturas = [];        // la caja del zoom (st.cajaDet) se conserva: cajaObjetivo la ignora si el producto se fue
+}
+
+/**
+ * Caja del producto ESTABILIZADA (para el zoom). La silueta cambia unos píxeles en
+ * cada cuadro aunque el producto esté quieto; si el zoom la siguiera tal cual, la
+ * imagen temblaría todo el tiempo. Zona muerta: los cambios pequeños se ignoran;
+ * los medianos se siguen poco a poco; un salto grande (otro producto) de inmediato.
+ */
+function estabilizarCaja(nueva) {
+  const p = st.cajaDet;
+  if (!p || st.modo !== "camara") return st.cajaDet = nueva.slice();
+  const [x, y, w, h] = nueva, [px, py, pw, ph] = p;
+  const mov = Math.hypot(x + w / 2 - (px + pw / 2), y + h / 2 - (py + ph / 2)) / Math.max(pw, ph, 1);
+  const esc = Math.abs(Math.log(Math.max(w * h, 1) / Math.max(pw * ph, 1)));
+  if (mov < 0.12 && esc < 0.2) return p;                      // temblor de la detección: quieto
+  const a = mov > 0.6 || esc > 0.7 ? 1 : 0.35;
+  return st.cajaDet = p.map((v, i) => v + a * (nueva[i] - v));
+}
 
 function procesar(d) {
   const ahora = performance.now() / 1000;
   if (!d.detectado) {
-    if (ahora - st.ultimaDet > 1.0) reiniciarPresencia();     // se retiró el producto
+    if (ahora - st.ultimaDet > 1.5) reiniciarPresencia();     // se retiró el producto
     mostrar(d); actualizarChip(); return;
   }
   st.ultimaDet = ahora;
-  // votación del reconocimiento (evita que salte entre productos cuadro a cuadro)
+  estabilizarCaja(d.caja);
+  // votación del reconocimiento (evita que salte entre productos cuadro a cuadro):
+  // hacen falta ~6 cuadros parecidos para decidir o para cambiar de producto
   if (st.modo === "foto") st.votos = { [d.reconocido_id]: 1 };       // una sola imagen: no hay a quién votar
   else {
-    for (const id in st.votos) st.votos[id] *= 0.7;
-    st.votos[d.reconocido_id] = (st.votos[d.reconocido_id] || 0) + 0.3;
+    for (const id in st.votos) st.votos[id] *= 0.85;
+    st.votos[d.reconocido_id] = (st.votos[d.reconocido_id] || 0) + 0.15;
   }
 
   const r = d.resultados, [x, y, w, h] = d.caja;
@@ -789,7 +813,7 @@ function procesar(d) {
   let desde = ahora;
   for (let i = st.muestras.length - 1; i >= 0; i--) {
     const s = st.muestras[i];
-    if (Math.abs(s.area - m.area) / m.area > 0.04 || Math.hypot(s.cx - m.cx, s.cy - m.cy) > 0.03) break;
+    if (Math.abs(s.area - m.area) / m.area > 0.06 || Math.hypot(s.cx - m.cx, s.cy - m.cy) > 0.035) break;
     desde = s.t;
   }
   const reconocido = st.producto >= 0 || productoEstable()[0] >= 0;
@@ -802,9 +826,28 @@ function procesar(d) {
   actualizarChip();
 }
 
-function suavizar(prev, r, a = 0.3) {
+const mediana = v => { const s = v.slice().sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+/** Valor más repetido (estado, calibre): no cambia por un solo cuadro distinto. */
+function moda(v) {
+  const c = new Map(); let mejor = v[v.length - 1], n = 0;
+  for (const x of v) { const k = (c.get(x) || 0) + 1; c.set(x, k); if (k > n || (k === n && x === v[v.length - 1])) { mejor = x; n = k; } }
+  return mejor;
+}
+
+/**
+ * Medidas estables: mediana de las últimas 7 lecturas (descarta cuadros raros, p. ej.
+ * una sombra que agrandó la silueta) y luego un promedio suave para que no salten.
+ */
+function suavizar(prev, r, a = 0.25) {
+  st.lecturas = [...(st.lecturas || []), r].slice(-7);
   const n = {};
-  for (const k of CLAVES) n[k] = (!prev || prev[k] == null || r[k] == null) ? r[k] : a * r[k] + (1 - a) * prev[k];
+  for (const k of CLAVES) {
+    const vals = st.lecturas.map(x => x[k]).filter(v => v != null);
+    const med = vals.length ? mediana(vals) : r[k];
+    n[k] = (!prev || prev[k] == null || med == null) ? med : a * med + (1 - a) * prev[k];
+  }
+  n.estado = moda(st.lecturas.map(x => x.estado));
+  n.calibre = moda(st.lecturas.map(x => x.calibre));
   return n;
 }
 
@@ -863,21 +906,23 @@ function mostrar(d) {
   }
   const r = d.resultados, rec0 = d.reconocimiento || {};
   const s = st.suav = st.modo === "camara" ? suavizar(st.suav, r) : { ...r };
-  $("prodNombre").textContent = r.producto;
+  const idEstable = st.producto < 0 ? productoEstable()[0] : -1;
+  const prodVisto = idEstable >= 0 ? nombre(idEstable) : r.producto;     // el votado, no el de este cuadro
+  $("prodNombre").textContent = prodVisto;
   if (st.producto < 0) {
     const [id] = productoEstable();
     const como = { ejemplos: "Reconocido con sus ejemplos", tabla: "Reconocido con la tabla de colores" };
     $("reconocido").textContent = id >= 0 ? (como[rec0.metodo] || "Reconocido automáticamente") : "Reconociendo…";
   } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere ${nombre(d.reconocido_id)}`;
-  pintarEstado(r.estado);
-  pintarRed(d.frescura, r);
+  pintarEstado(s.estado);
+  pintarRed(d.frescura, s);        // s: estado y daño estables (los que se muestran)
 
   const curvo = r.metodo_volumen === "curvo", lamina = r.metodo_volumen === "lamina";
   $("t_dim").textContent = curvo ? "Largo sobre el arco × grosor" : lamina ? "Largo × ancho de la hoja" : "Largo × diámetro";
   $("f_vol").textContent = curvo ? "π∫r²ds" : lamina ? "e·A (lámina)" : "π∫r²dx";
 
   // colores medidos en la piel frente a la paleta de la tabla
-  const medidos = d.colores || [], paleta = paletaDe(r.producto);
+  const medidos = d.colores || [], paleta = paletaDe(prodVisto);
   $("colores").hidden = !medidos.length;
   $("colMedidos").innerHTML = medidos.map(c => `<i style="background:${c.hex};width:${c.pct}%" title="${c.hex} · ${fmt(c.pct, 0)} %"></i>`).join("");
   $("colTabla").innerHTML = puntos(paleta);
@@ -888,12 +933,12 @@ function mostrar(d) {
   $("v_dim").textContent = `${fmt(s.largo_cm, 1)} × ${fmt(s.diametro_cm, 1)} cm`;
   $("v_dano").textContent = fmt(s.dano_pct, 1) + " %";
   $("v_mad").textContent = s.madurez_pct == null ? "no aplica" : fmt(s.madurez_pct, 0) + " %";
-  $("v_cal").textContent = r.calibre;
+  $("v_cal").textContent = s.calibre;
   $("barDano").style.width = Math.min(100, (s.dano_pct || 0) * 4) + "%";
   $("barMad").style.width = (s.madurez_pct ?? 0) + "%";
 
   // resumen sobre la cámara (visible en el celular sin bajar)
-  $("hudProd").textContent = r.producto;
+  $("hudProd").textContent = prodVisto;
   $("hudArea").textContent = fmt(s.area_cm2, 1) + " cm²";
   $("hudVol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
   $("hudRes").hidden = false;
@@ -917,11 +962,12 @@ function mostrar(d) {
 // ---------------------------------------------------------------- dibujo con zoom al producto
 function cajaObjetivo(fw, fh) {
   const d = st.det, ahora = performance.now() / 1000;
-  if (!st.zoom || !d?.detectado || (st.modo === "camara" && ahora - st.ultimaDet > 1.0)) return [0, 0, fw, fh];
-  const [x, y, w, h] = d.caja, A = fw / fh;
-  let bw = w * 2.1, bh = h * 2.1;                      // el producto ocupa ~la mitad de la vista
+  if (!st.zoom || !d?.detectado || (st.modo === "camara" && ahora - st.ultimaDet > 1.5)) return [0, 0, fw, fh];
+  const [x, y, w, h] = (st.modo === "camara" && st.cajaDet) || d.caja, A = fw / fh;
+  let bw = w * 2.5, bh = h * 2.5;                      // el producto ocupa ~40 % de la vista
   if (bw / bh < A) bw = bh * A; else bh = bw / A;
-  if (bw < fw * 0.3) { bw = fw * 0.3; bh = bw / A; }   // zoom máximo ~3x
+  // zoom máximo ~2x: más aumento también aumenta el temblor de la mano
+  if (bw < fw * 0.5) { bw = fw * 0.5; bh = bw / A; }
   bw = Math.min(bw, fw); bh = Math.min(bh, fh);
   const x0 = Math.min(Math.max(x + w / 2 - bw / 2, 0), fw - bw);
   const y0 = Math.min(Math.max(y + h / 2 - bh / 2, 0), fh - bh);
@@ -945,7 +991,11 @@ function dibujar() {
   const c = vista.getContext("2d");
 
   const obj = cajaObjetivo(fw, fh);
-  st.caja = st.caja ? st.caja.map((v, i) => v + 0.12 * (obj[i] - v)) : obj;     // movimiento suave
+  // movimiento suave y por TIEMPO (~0.45 s), igual en un celular a 30 fps que en un PC a 144 fps
+  const tAhora = performance.now(), dt = Math.min(0.1, (tAhora - (st.tDibujo || tAhora)) / 1000);
+  st.tDibujo = tAhora;
+  const fr = 1 - Math.exp(-dt / 0.45);
+  st.caja = st.caja ? st.caja.map((v, i) => v + fr * (obj[i] - v)) : obj;
   const [bx, by, bw, bh] = st.caja, k = cw / bw;
 
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -1033,7 +1083,7 @@ async function calibrar() {
   const resp = await fetch("/api/calibrar", { method: "POST", body: formulario(await cuadro()) });
   const d = await resp.json();
   if (!d.ok) { aviso(d.mensaje || d.error || "No se pudo calibrar."); return; }
-  st.px = d.px_por_cm; st.calibrado = true; localStorage.px_por_cm = st.px; st.suav = null;
+  st.px = d.px_por_cm; st.calibrado = true; localStorage.px_por_cm = st.px; st.suav = null; st.lecturas = [];
   mostrarEscala(); analizarUnaVez();
   aviso(`Calibrado: ${st.px.toFixed(2)} px/cm (lado largo ${d.lado_px.toFixed(0)} px = 8.56 cm)`, 4500);
 }
@@ -1103,7 +1153,7 @@ function mostrarConteo() {
   const txt = Object.entries(c).map(([n, k]) => `${n} ${k}`).join(" · ");
   $("ejResumen").textContent = st.ejemplos.length ? `${st.ejemplos.length} ejemplos` : "";
   $("conteo").innerHTML = txt ? `Guardados: ${txt}. <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
-                              : "Sin ejemplos propios: reconoce con las fotos de la tabla de colores y el perfil de cada producto.";
+                              : "Sin ejemplos propios: reconoce con las fotos de frutas de la tabla de colores y el perfil de cada producto.";
   const b = $("btnOlvidarEj");
   if (b) b.onclick = () => { st.ejemplos = []; localStorage.removeItem("ejemplos"); st.votos = {}; mostrarConteo(); analizarUnaVez();
                              aviso("Ejemplos borrados."); };
@@ -1180,9 +1230,9 @@ document.addEventListener("keydown", e => {
   ]);
   st.productos = productos; st.tabla = tabla.ejemplos || [];
   pintarGaleria();
-  const grupos = lista => ["Fruta", "Verdura", "Otro"].map(cat => {
+  const grupos = lista => ["Fruta", "Otro"].map(cat => {
     const ps = st.productos.filter(p => (p.categoria || "Otro") === cat);
-    return ps.length ? `<optgroup label="${{ Fruta: "Frutas", Verdura: "Verduras", Otro: "Otro" }[cat]}">${ps.map(lista).join("")}</optgroup>` : "";
+    return ps.length ? `<optgroup label="${{ Fruta: "Frutas", Otro: "Otro" }[cat]}">${ps.map(lista).join("")}</optgroup>` : "";
   }).join("");
   $("producto").innerHTML = `<option value="-1">Automático (reconocer)</option>` +
     grupos(p => `<option value="${p.id}">${p.id < 9 ? (p.id + 1) + ". " : ""}${p.nombre}</option>`);
@@ -1192,6 +1242,7 @@ document.addEventListener("keydown", e => {
   $("producto").value = st.producto;
   $("ensenarProd").innerHTML = grupos(p => `<option value="${p.id}">${p.nombre}</option>`);
   if (st.producto >= 0) $("ensenarProd").value = st.producto;
+  // solo ejemplos de productos que siguen en la lista (se quitaron las verduras, el tomate y el aguacate)
   st.ejemplos = st.ejemplos.filter(e => e.nombre ? e.nombre in porNombre : e.producto < st.productos.length)
                            .map(e => e.nombre ? { ...e, producto: porNombre[e.nombre] } : e);
   localStorage.ejemplos = JSON.stringify(st.ejemplos);

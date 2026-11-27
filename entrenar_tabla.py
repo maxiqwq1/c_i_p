@@ -1,7 +1,7 @@
 """
 ENTRENAMIENTO BASE con la tabla "Configuración de colores en frutas y verduras".
 
-Las 16 fotos de la tabla (web/ejemplos/*.jpg, recortadas de web/ejemplos/tabla-colores.jpg)
+Las fotos de las 9 frutas de la tabla (web/ejemplos/*.jpg, recortadas de web/ejemplos/tabla-colores.jpg)
 se analizan con el mismo proceso que la cámara y sus RASGOS (colores, forma, tamaño)
 se guardan en entrenamiento_tabla.json. El reconocimiento los usa como ejemplos de
 referencia (vecino más cercano) antes de las reglas de productos.py.

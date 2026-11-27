@@ -305,7 +305,7 @@ RUTA_TABLA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entrenami
 
 def cargar_ejemplos_tabla(ruta=RUTA_TABLA):
     """
-    Entrenamiento base: los rasgos de las fotos de la tabla de colores
+    Entrenamiento base: los rasgos de las fotos de frutas de la tabla de colores
     (los genera entrenar_tabla.py). Se usan como ejemplos de referencia.
     """
     try:
@@ -539,7 +539,7 @@ def reconocer(rasgos, ejemplos=None, tabla=True):
     Decide qué producto es.
       1) Si hay EJEMPLOS enseñados y alguno se parece lo suficiente (vecino más cercano),
          gana ese: aprende las frutas y la luz reales del usuario.
-      2) Si se parece mucho a una de las fotos de la TABLA de colores (entrenamiento base), esa.
+      2) Si se parece mucho a una de las fotos de frutas de la TABLA de colores (entrenamiento base), esa.
       3) Si no, REGLAS: el perfil de cada ficha (productos.py), ajustado con esas mismas fotos.
       4) Si nada coincide: "Genérico".
     Devuelve (índice, info) con el método usado y los 3 mejores candidatos (para explicar la decisión).

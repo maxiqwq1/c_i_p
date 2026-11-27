@@ -70,10 +70,8 @@ def leer_ejemplos(texto, maximo=300):
     for e in datos[:maximo] if isinstance(datos, list) else []:
         try:
             # el nombre manda (si se agregan o quitan productos, los índices cambian); el índice es
-            # respaldo. Un nombre que ya no existe (producto quitado) se descarta.
-            if e.get("nombre") and e["nombre"] not in por_nombre:
-                continue
-            i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
+            # respaldo. Un nombre que ya no existe (producto quitado) da -1 y se descarta.
+            i = por_nombre.get(e["nombre"], -1) if e.get("nombre") else int(e["producto"])
             r = e["rasgos"]
             rasgos = {"hist": [float(v) for v in r["hist"]], "calibrado": bool(r.get("calibrado")),
                       **{k: float(r[k]) for k in ("palidez", "sat", "val", "alarg", "diam_cm")}}
@@ -141,8 +139,10 @@ def salud():
 
 @app.get("/ejemplos/<path:archivo>")
 def ejemplos(archivo):
-    """Fotos de la tabla de colores (ejemplos.json dice su escala supuesta) para probar sin cámara."""
-    return send_from_directory(os.path.join(CARPETA_WEB, "ejemplos"), archivo, max_age=86400)
+    """Fotos de la tabla de colores (ejemplos.json dice su escala supuesta) para probar sin cámara.
+    La lista (ejemplos.json) no se guarda en caché: cambia cuando se agregan o quitan productos."""
+    return send_from_directory(os.path.join(CARPETA_WEB, "ejemplos"), archivo,
+                               max_age=0 if archivo.endswith(".json") else 86400)
 
 
 @app.get("/api/productos")
