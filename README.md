@@ -12,7 +12,7 @@ La cámara observa la fruta y el programa calcula:
 | Cálculo con píxeles | Suma de Riemann (Δx = 1 píxel) | A ≈ Σ [f(xᵢ) − g(xᵢ)] Δx |
 | Área dañada | Suma doble de Riemann (cada píxel = (1/k)² cm²) | A_daño ≈ Σ ΔA |
 
-Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre.
+Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre. En manzana, banano y naranja, una **red neuronal** entrenada con fotos reales decide el estado junto con el daño medido (ver *El estado: red neuronal + daño medido*).
 
 **Productos incluidos** (`productos.py`): **solo frutas** de la **tabla de colores** (ver abajo). Las verduras de la tabla, el tomate y el aguacate se quitaron.
 - Frutas: naranja, limón (amarillo o lima verde), manzana roja, manzana verde/amarilla, mango, **banano** y **pera**.
@@ -86,31 +86,41 @@ Resultados: las 7 fotos de la tabla se reconocen todas, también borrosas, oscur
 
 Prueba con frutas sintéticas (18 tipos de fruta × 4 escenas de luz/fondo, calibrado y sin calibrar, incluidas la pera y frutas que no se usaron para ajustar): acierta el 100 % (288/288). Con luz cálida sobre madera (el color no se puede corregir) acierta el 87.5 % —confunde la manzana amarilla con la roja y la lima con la manzana verde— y el 100 % tras enseñar ejemplos. La versión de reconocimiento original acertaba el 53 % en las frutas (confundía siempre la manzana verde con limón).
 
-## Segunda opinión: red neuronal fresco / podrido
-En **manzana, banano y naranja** se muestra, junto al estado, la *segunda opinión* de una red neuronal que mira la foto y dice si el producto se ve **fresco o podrido** (con su probabilidad). Es independiente del cálculo: el estado lo sigue decidiendo el área dañada. Si no coinciden (por ejemplo, el cálculo dice BUENO y la red dice *Podrido*), la página avisa para revisar el producto.
+## El estado: red neuronal + daño medido
+El daño se mide con cálculo integral: el área de las manchas oscuras (suma doble de Riemann). Pero con fotos reales de fruta podrida eso no basta: el **moho blanco o verde**, la **piel arrugada** o el **café parejo** no son "manchas más oscuras que la luz". Con 758 fotos de prueba de fruta real, decidir solo con el daño mandaba a DESCARTE apenas el **3.5 %** de las frutas podridas (la mayoría salían BUENO o INMADURO).
 
-- **Datos**: el dataset de Kaggle *Fruits fresh and rotten for classification* (`sriramr/fruits-fresh-and-rotten-for-classification`): 6 clases (manzana, banano y naranja, frescas y podridas).
-- **Red**: MobileNetV2 preentrenada con ImageNet, con la última capa cambiada a 6 salidas (transferencia de aprendizaje), entrenada 10 épocas. P(podrido) = suma de las probabilidades (softmax) de las 3 clases podridas.
-- **En la página**: el modelo (`modelo_frescura.onnx`, 9 MB) lo ejecuta OpenCV, sin PyTorch en el servidor, y tarda unos 5-15 ms por cuadro. Recibe un cuadrado alrededor del producto detectado.
-- **Una trampa del dataset**: de sus 13 599 imágenes solo 1 511 son fotos distintas; las demás son copias giradas, volteadas, desplazadas o con ruido, repartidas al azar entre `train` y `test` (1 310 fotos tienen copias en los dos lados). Medir con ese `test` es medir con fotos ya vistas. Aquí se separó **por foto original**: 70 % entrenamiento, 15 % validación y 15 % prueba, sin copias compartidas. (El notebook de Kaggle que usa este dataset, además, planteaba mal la salida —una sola salida sí/no para 6 clases— y acertaba el 14.5 %, menos que al azar).
+Por eso, en **manzana, banano y naranja**, una **red neuronal** que aprendió de fotos reales calcula la probabilidad de que la fruta esté podrida, P(podrido), y el estado se decide con las dos cosas:
 
-Resultados con las 227 fotos de prueba (nunca vistas al entrenar):
-
-| Prueba | Acierto fresco / podrido |
+| Lo que ve la red | Estado |
 |---|---|
-| Foto completa | 99.1 % (fruta y estado, 6 clases: 98.7 %) |
-| Por el camino de la página (detectar → recortar → red) | 98.0 % |
-| El producto pegado sobre gris, madera, mantel verde o fondo oscuro | 96-98 % |
-| Con baja resolución, ruido, luz cálida, fría u oscura, o todo junto (como una cámara web) | 98.7-99.6 % |
+| P(podrido) ≥ 50 % (la ve podrida) | **DESCARTE** |
+| 40 % ≤ P(podrido) < 50 % (duda) | **REGULAR** (o DESCARTE si el daño medido ya lo exige) |
+| P(podrido) < 40 % (la ve fresca) | decide el **daño medido**, como siempre: BUENO, REGULAR o DESCARTE (e INMADURO por el color) |
 
-Las 4 fotos reales de la tabla de colores (frescas) salen *Fresco*. Las frutas sintéticas con manchas dibujadas grandes salen *Podrido*.
+Los dos umbrales se eligieron con las fotos de **validación** y se midieron con las de **prueba**. La página, la lámina y el CSV muestran también el estado que daría *solo el daño* y el motivo de la decisión. Con las demás frutas (limón, mango, pera), que la red no conoce, decide solo el daño medido.
 
-Para volver a entrenar (unos 4 minutos con una tarjeta NVIDIA RTX 2080 Ti):
+Resultados con fotos reales que la red nunca vio (227 fotos de prueba, cada una sobre su fondo original, gris, madera y oscuro; 758 casos):
+
+| Cómo se decide | Acierto (descartar o no) | Podridas → DESCARTE | Frescas → DESCARTE (error) |
+|---|---|---|---|
+| Solo el daño medido | 45.5 % | 3.5 % | 0 % |
+| **Red neuronal + daño** | **98.4 %** | **98.8 %** | **2.1 %** |
+
+Por fondo, con red + daño: original 99.0 %, gris 98.4 %, madera 97.8 %, oscuro 98.4 %. Con baja resolución, ruido o luz cálida, fría u oscura (como una cámara web), la red acierta fresco/podrido entre el 98.2 y el 99.6 %. Las 7 fotos reales de la tabla de colores (frescas) siguen en BUENO.
+
+**La red**
+- **Datos**: el dataset de Kaggle *Fruits fresh and rotten for classification* (`sriramr/fruits-fresh-and-rotten-for-classification`): 6 clases (manzana, banano y naranja, frescas y podridas).
+- **Red**: MobileNetV2 preentrenada con ImageNet, con la última capa cambiada a 6 salidas (transferencia de aprendizaje), entrenada 12 épocas. P(podrido) = suma de las probabilidades (softmax) de las 3 clases podridas. Acierta fresco/podrido el 99.1 % de las fotos de prueba.
+- **En la página**: el modelo (`modelo_frescura.onnx`, 9 MB) lo ejecuta OpenCV, sin PyTorch en el servidor, y tarda unos 5-15 ms por cuadro. Recibe un cuadrado alrededor del producto detectado.
+- **Una trampa del dataset**: de sus 13 599 imágenes solo 1 511 son fotos distintas; las demás son copias giradas, espejadas, desplazadas o con ruido, repartidas al azar entre `train` y `test` (1 310 fotos tienen copias en los dos lados). Medir con ese `test` es medir con fotos ya vistas. Aquí se separó **por foto original**: 70 % entrenamiento, 15 % validación y 15 % prueba, sin copias compartidas. (El notebook de Kaggle que usa este dataset, además, planteaba mal la salida —una sola salida sí/no para 6 clases— y acertaba el 14.5 %, menos que al azar).
+- **Otra trampa: el fondo**. En el dataset las frutas frescas casi siempre están sobre fondo blanco, y las podridas muchas veces sobre madera o tela: una red entrenada así aprende "fondo de color = podrido" y se equivoca con una fruta fresca sobre la mesa. Por eso, al entrenar, cada fruta se recorta con el mismo detector de la página y se pega sobre fondos al azar (colores, degradados, rayas tipo madera o tela, texturas de otras fotos, a veces con sombra). Con eso, las frutas frescas mandadas por error a DESCARTE bajaron del 3.3 % al 2.1 %, y sobre madera el acierto subió del 96.7 % al 97.8 %.
+
+Para volver a entrenar (unos 8 minutos con una tarjeta NVIDIA RTX 2080 Ti):
 ```
 pip install -r requirements-entrenamiento.txt
 python entrenar_frescura.py "C:\ruta\del\dataset\dataset"
 ```
-La ruta es la carpeta que tiene `train` y `test`. Las fotos del dataset no se suben al repositorio (en Kaggle su licencia figura como desconocida): solo el modelo entrenado. `modelo_frescura.json` guarda los resultados de la prueba.
+La ruta es la carpeta que tiene `train` y `test`. Si el entrenamiento se corta al final, `python entrenar_frescura.py "C:\ruta..." --solo-evaluar` termina con el mejor punto guardado. Las fotos del dataset no se suben al repositorio (en Kaggle su licencia figura como desconocida): solo el modelo entrenado. `modelo_frescura.json` guarda los resultados de la prueba.
 
 ## Recomendaciones para la cámara real
 - Un fondo de color **distinto** al producto (mesa, mantel u hoja) y buena luz. Que el producto no toque el borde de la imagen.
@@ -129,9 +139,9 @@ Edite `productos.py` y agregue una ficha antes de *Genérico* (color de madurez,
 
 ## Limitaciones (para mencionar en el informe)
 - El método de discos supone secciones **circulares** alrededor del eje (recto o curvo). Funciona bien con las frutas redondas y con el banano (eje curvo). Productos que no son sólidos de revolución (una hoja, un brócoli) o que son huecos (un pimiento) no están incluidos: se medirían como *Genérico*.
-- La **segunda opinión** solo existe para manzana, banano y naranja, y aparece cuando el producto se reconoce o se elige a mano. Una fruta muy podrida pierde su color, y el reconocimiento por color puede confundirla con otro producto: en ese caso, elija el producto a mano. Las fotos del dataset son de internet, casi todas de estudio: con la cámara real puede acertar menos.
+- La **red neuronal** solo decide en manzana, banano y naranja, y actúa cuando el producto se reconoce o se elige a mano. Una fruta muy podrida pierde su color, y el reconocimiento por color puede confundirla con otro producto: en ese caso, elija el producto a mano. Con limón, mango y pera decide solo el daño medido, que no ve el moho ni la piel arrugada. Las fotos del dataset son de internet, casi todas de estudio: con la cámara real puede acertar menos (pruébela con frutas frescas y podridas de verdad).
 - La cámara ve una proyección 2D. La silueta está un poco más cerca de la cámara que la hoja, así que la escala tiene un pequeño error de perspectiva.
-- El reconocimiento usa reglas de color, forma y tamaño más ejemplos (los de la tabla y los que usted enseñe, por vecino más cercano), no una red neuronal (la red neuronal solo da la segunda opinión fresco / podrido). Los pares más difíciles son **lima / manzana verde** (sin calibrar; el tamaño los separa) y, con luz cálida, **manzana amarilla / manzana roja**: calibre, enseñe 2-3 ejemplos de cada uno o elija el producto a mano. Las fotos de la tabla son de estudio: con la cámara real decide sobre todo el perfil de cada producto. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
+- El reconocimiento usa reglas de color, forma y tamaño más ejemplos (los de la tabla y los que usted enseñe, por vecino más cercano), no una red neuronal (la red neuronal decide fresco / podrido, no qué fruta es). Los pares más difíciles son **lima / manzana verde** (sin calibrar; el tamaño los separa) y, con luz cálida, **manzana amarilla / manzana roja**: calibre, enseñe 2-3 ejemplos de cada uno o elija el producto a mano. Las fotos de la tabla son de estudio: con la cámara real decide sobre todo el perfil de cada producto. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
 - Las pecas de un banano maduro son normales: en el banano solo cuentan como daño las manchas muy oscuras. En las zonas con poca luz el umbral de daño baja con la luz y se ignoran las grietas finas, así que solo cuentan las manchas grandes.
 
 ## Archivos
@@ -142,6 +152,6 @@ Edite `productos.py` y agregue una ficha antes de *Genérico* (color de madurez,
 - `demo_sintetica.py`: simulación de validación
 - `productos.py`: fichas de producto (con la paleta de la tabla de colores)
 - `entrenar_tabla.py` → `entrenamiento_tabla.json`: entrenamiento base con las fotos de la tabla
-- `frescura.py`: segunda opinión fresco / podrido (ejecuta `modelo_frescura.onnx` con OpenCV)
+- `frescura.py`: red neuronal fresco / podrido (ejecuta `modelo_frescura.onnx` con OpenCV) y la decisión del estado junto con el daño
 - `entrenar_frescura.py` → `modelo_frescura.onnx` + `modelo_frescura.json`: entrenamiento de la red con el dataset de Kaggle (necesita `requirements-entrenamiento.txt`)
 - `web/ejemplos/`: la tabla de colores, las fotos recortadas de las 7 frutas y `ejemplos.json`

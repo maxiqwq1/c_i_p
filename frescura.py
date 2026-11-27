@@ -1,16 +1,24 @@
 """
-SEGUNDA OPINIÓN: ¿FRESCO O PODRIDO? (red neuronal)
+RED NEURONAL: ¿FRESCO O PODRIDO? Y CÓMO DECIDE EL ESTADO JUNTO CON EL DAÑO
 
-El estado del producto lo decide el cálculo (área dañada = suma de Riemann sobre los píxeles
-oscuros, ver vision.py). Esta red neuronal da una segunda opinión independiente, aprendida de
-fotos reales: el dataset de Kaggle "Fruits fresh and rotten for classification"
-(manzana, banano y naranja; ver entrenar_frescura.py y modelo_frescura.json).
+El cálculo mide el daño como área de manchas oscuras (suma de Riemann sobre los píxeles mucho
+más oscuros que la luz local, ver vision.py). Con fotos reales de fruta podrida eso no basta:
+el moho blanco o verde, la piel arrugada o el café parejo no son "manchas más oscuras que la luz"
+(con las fotos de prueba de Kaggle, el cálculo solo descartaba el 3 % de las frutas podridas).
+Esta red neuronal, aprendida de fotos reales (dataset de Kaggle "Fruits fresh and rotten for
+classification"; ver entrenar_frescura.py y modelo_frescura.json), sí los reconoce. Por eso el
+estado se decide con las dos cosas (función decidir):
 
-- Solo opina sobre Manzana roja, Manzana verde, Banano y Naranja (las frutas que vio al entrenar).
+  P(podrido) ≥ RED_PODRIDO            -> DESCARTE (la red la ve podrida)
+  RED_DUDA ≤ P(podrido) < RED_PODRIDO -> REGULAR, o DESCARTE si el daño medido ya lo exige
+  P(podrido) < RED_DUDA               -> decide el daño medido, como siempre
+                                         (BUENO / REGULAR / DESCARTE, e INMADURO por el color)
+
+- Solo para Manzana roja, Manzana verde, Banano y Naranja (las frutas que vio al entrenar);
+  con las demás frutas decide solo el daño medido.
 - La red es una MobileNetV2 exportada a ONNX; la ejecuta OpenCV (cv2.dnn), sin PyTorch.
 - Entrada: un cuadrado alrededor del producto (con un margen), tal como lo ve la cámara;
-  224 × 224 píxeles normalizados como ImageNet. Pintar el fondo de blanco (como las fotos del
-  dataset) resultó peor: la máscara recorta a veces el moho o el borde, y eso cambia la opinión.
+  224 × 224 píxeles normalizados como ImageNet.
 - Salida: 6 probabilidades (softmax). P(podrido) = suma de las 3 clases podridas.
 """
 import json
@@ -23,6 +31,10 @@ import numpy as np
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 RUTA_MODELO = os.path.join(RAIZ, "modelo_frescura.onnx")
 RUTA_INFO = os.path.join(RAIZ, "modelo_frescura.json")
+
+# Umbrales de la decisión (elegidos con las fotos de VALIDACIÓN; medidos con las de PRUEBA, ver README)
+RED_PODRIDO = 0.5
+RED_DUDA = 0.4
 
 # producto de productos.py -> fruta del dataset
 FRUTA = {"Manzana roja": "apples", "Manzana verde": "apples", "Banano": "banana", "Naranja": "oranges"}
@@ -41,7 +53,7 @@ def disponible():
                 _info = json.load(f)
             _red = cv2.dnn.readNetFromONNX(RUTA_MODELO)
         except (OSError, ValueError, cv2.error) as e:
-            print("Segunda opinión (red neuronal) no disponible:", e)
+            print("Red neuronal fresco/podrido no disponible (decide solo el daño):", e)
             _red = False
     return _red is not False
 
@@ -80,7 +92,7 @@ def probabilidades(cuadro_bgr):
 
 
 def evaluar(imagen, contorno, producto):
-    """Segunda opinión para el producto detectado, o None si no aplica o no hay modelo."""
+    """Lo que ve la red para el producto detectado, o None si no aplica o no hay modelo."""
     if not aplica(producto) or not disponible():
         return None
     p = probabilidades(recorte(imagen, contorno))
@@ -90,9 +102,37 @@ def evaluar(imagen, contorno, producto):
     fruta_red = NOMBRE_FRUTA.get(mejor.replace("fresh", "").replace("rotten", ""), "?")
     return {
         "podrido": round(podrido, 4), "fresco": round(1 - podrido, 4),
-        "veredicto": "Podrido" if podrido >= 0.5 else "Fresco",
+        "veredicto": "Podrido" if podrido >= RED_PODRIDO else "Dudoso" if podrido >= RED_DUDA else "Fresco",
         "confianza": round(max(podrido, 1 - podrido), 4),
         "fruta_red": fruta_red,                                 # qué fruta cree la red que es
         "coincide_fruta": fruta_red == NOMBRE_FRUTA[FRUTA[producto]],
+        "umbrales": [RED_DUDA, RED_PODRIDO],                    # para que la página muestre las zonas
         "probabilidades": {c: round(float(v), 4) for c, v in zip(clases, p)},
     }
+
+
+def texto(red):
+    """Lo que ve la red, en corto: 'Fresco 96 %', 'Dudoso (45 % podrido)' o 'Podrido 92 %'."""
+    P = red["podrido"]
+    if red["veredicto"] == "Fresco":
+        return f"Fresco {100 * (1 - P):.0f} %"
+    if red["veredicto"] == "Dudoso":
+        return f"Dudoso ({100 * P:.0f} % podrido)"
+    return f"Podrido {100 * P:.0f} %"
+
+
+def decidir(estado_calculo, red, dano_pct, producto):
+    """Estado final con la red y el daño medido. Devuelve (estado, motivo)."""
+    if red is None:
+        if aplica(producto):
+            return estado_calculo, f"Decide el daño medido ({dano_pct:.1f} %): la red neuronal no está disponible."
+        return estado_calculo, (f"Decide el daño medido ({dano_pct:.1f} %): la red neuronal solo conoce "
+                                f"manzana, banano y naranja.")
+    P = red["podrido"]
+    if P >= RED_PODRIDO:
+        return "DESCARTE", f"La red neuronal la ve podrida ({100 * P:.0f} %)."
+    if P >= RED_DUDA:
+        if estado_calculo == "DESCARTE":
+            return "DESCARTE", f"Daño medido de {dano_pct:.1f} % y la red duda ({100 * P:.0f} % podrido)."
+        return "REGULAR", f"La red duda ({100 * P:.0f} % podrido): conviene revisarla."
+    return estado_calculo, f"La red la ve fresca ({100 * (1 - P):.0f} %): decide el daño medido ({dano_pct:.1f} %)."

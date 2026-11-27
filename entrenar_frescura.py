@@ -1,5 +1,5 @@
 """
-Entrena la "segunda opinión" fresco / podrido (red neuronal) con el dataset de Kaggle
+Entrena la red neuronal fresco / podrido con el dataset de Kaggle
 "Fruits fresh and rotten for classification" (manzana, banano y naranja; 6 clases).
 
     pip install -r requirements-entrenamiento.txt      (PyTorch: solo para entrenar)
@@ -10,10 +10,18 @@ OpenCV (cv2.dnn) ejecuta el .onnx (ver frescura.py).
 
 Por qué se rehace la división train/test del dataset:
 el dataset tiene solo 1 511 fotos originales; las demás son copias giradas (15°-75°),
-volteadas, desplazadas o con ruido de esas mismas fotos, repartidas al azar entre train y test
+espejadas, desplazadas o con ruido de esas mismas fotos, repartidas al azar entre train y test
 (1 310 originales tienen copias en los dos lados). Medir con ese test es medir con fotos que el
 modelo ya vio. Aquí se separa POR FOTO ORIGINAL (todas sus copias van al mismo lado):
 70 % entrenamiento, 15 % validación (elegir la mejor época) y 15 % prueba (la medida final).
+
+Por qué se cambia el fondo de las fotos al entrenar:
+en el dataset las frutas frescas casi siempre están sobre fondo blanco y las podridas muchas veces
+sobre madera o tela. Una red entrenada así aprende el atajo "fondo de color = podrido" y se
+equivoca con una fruta fresca sobre la mesa. Por eso se calcula la silueta de cada foto original
+con el mismo detector de la página (vision.segmentar) y, al entrenar, la fruta (fresca o podrida)
+se pega muchas veces sobre fondos al azar: colores lisos, degradados, rayas tipo madera o tela,
+o texturas de las propias fotos, a veces con sombra.
 
 Red: MobileNetV2 preentrenada en ImageNet (transferencia de aprendizaje), última capa de 6 salidas.
 """
@@ -25,7 +33,9 @@ import re
 import time
 from collections import defaultdict
 from datetime import date
+from multiprocessing import Pool
 
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
@@ -39,12 +49,15 @@ MEDIA = [0.485, 0.456, 0.406]          # normalización de ImageNet (la misma en
 DESV = [0.229, 0.224, 0.225]
 ENTRADA = 224
 COPIA = re.compile(r"^(rotated_by_-?\d+_|vertical_flip_|translation_|saltandpepper_)")
+# copias alineadas con la foto original: se puede usar su silueta (la "vertical_flip" es un espejo izq.-der.)
+SILUETA_DE_COPIA = {"": "igual", "saltandpepper_": "igual", "vertical_flip_": "espejo"}
+PROB_FONDO = 0.6                       # fracción de las fotos de entrenamiento con el fondo cambiado
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 
 
 # ---------------------------------------------------------------- datos
 def listar(carpeta):
-    """{(clase, foto original): [rutas de la original y sus copias]} juntando train y test."""
+    """{(clase, foto original): {archivo: ruta}} juntando train y test (la original y sus copias)."""
     grupos = defaultdict(dict)
     for parte in ("train", "test"):
         for c in CLASES:
@@ -71,31 +84,125 @@ def dividir(grupos, semilla=7, fracciones=(0.70, 0.15)):
     return partes
 
 
-def cargar(ruta):
-    """RGB sobre fondo blanco (si trae transparencia) y cuadrada (relleno blanco), como en frescura.py."""
+def rgb(ruta):
+    """Imagen RGB (si trae transparencia, sobre blanco)."""
     im = Image.open(ruta)
     if im.mode in ("RGBA", "LA", "P"):
         im = im.convert("RGBA")
-        fondo = Image.new("RGBA", im.size, (255, 255, 255, 255))
-        im = Image.alpha_composite(fondo, im)
-    im = im.convert("RGB")
-    w, h = im.size
-    lado = max(w, h)
-    cuadro = Image.new("RGB", (lado, lado), (255, 255, 255))
-    cuadro.paste(im, ((lado - w) // 2, (lado - h) // 2))
-    return cuadro
+        im = Image.alpha_composite(Image.new("RGBA", im.size, (255, 255, 255, 255)), im)
+    return np.asarray(im.convert("RGB"))
+
+
+def cuadrar(a, relleno):
+    """Centra la imagen (o máscara) en un cuadrado, rellenando con `relleno` (como frescura.py)."""
+    h, w = a.shape[:2]
+    lado = max(h, w)
+    out = np.full((lado, lado) + a.shape[2:], relleno, a.dtype)
+    y0, x0 = (lado - h) // 2, (lado - w) // 2
+    out[y0:y0 + h, x0:x0 + w] = a
+    return out
+
+
+# ---------------------------------------------------------------- siluetas (detector de la página)
+def _silueta(args):
+    ruta, destino = args
+    import vision                                   # el mismo detector de la página
+    img = cv2.cvtColor(rgb(ruta), cv2.COLOR_RGB2BGR)
+    H, W = img.shape[:2]
+    a, b = H // 4, W // 4                           # margen: la fruta no debe tocar el borde
+    m, _ = vision.segmentar(cv2.copyMakeBorder(img, a, a, b, b, cv2.BORDER_REPLICATE), None, 50)
+    m = np.zeros((1, 1), np.uint8) if m is None else m[a:a + H, b:b + W]
+    if m.size > 1 and not 0.03 <= (m > 0).mean() <= 0.95:
+        m = np.zeros((1, 1), np.uint8)              # silueta dudosa: esa foto no cambia de fondo
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    cv2.imencode(".png", m)[1].tofile(destino)
+
+
+def calcular_siluetas(grupos, pares, carpeta):
+    trabajos = []
+    for c, b in pares:
+        destino = os.path.join(carpeta, c, os.path.splitext(b)[0] + ".png")
+        if b in grupos[(c, b)] and not os.path.exists(destino):
+            trabajos.append((grupos[(c, b)][b], destino))
+    if trabajos:
+        print(f"Calculando {len(trabajos)} siluetas con el detector de la página…", flush=True)
+        with Pool(min(8, os.cpu_count() or 2)) as p:
+            p.map(_silueta, trabajos, chunksize=8)
+
+
+def leer_silueta(ruta):
+    if not ruta or not os.path.exists(ruta):
+        return None
+    m = cv2.imdecode(np.fromfile(ruta, np.uint8), cv2.IMREAD_GRAYSCALE)
+    return m if m is not None and m.size > 1 else None
+
+
+# ---------------------------------------------------------------- fondos al azar
+def fondo_al_azar(lado, R, texturas):
+    """Fondo de lado×lado: color liso, degradado, rayas (madera/tela) o textura de otra foto."""
+    rng = np.random.default_rng(R.getrandbits(32))
+    def color():
+        return np.array([R.randint(0, 255) for _ in range(3)], np.float32) * R.uniform(0.35, 1.0)
+    t = R.random()
+    if t < 0.3:
+        f = np.ones((lado, lado, 3), np.float32) * color()
+    elif t < 0.5:
+        a = R.uniform(0, 2 * np.pi)
+        yy, xx = np.mgrid[0:lado, 0:lado] / lado
+        u = (np.cos(a) * xx + np.sin(a) * yy)
+        u = (u - u.min()) / (np.ptp(u) + 1e-6)
+        c1, c2 = color(), color()
+        f = c1 + u[..., None] * (c2 - c1)
+    elif t < 0.75 or not texturas:
+        a, periodo = R.uniform(0, np.pi), R.uniform(0.02, 0.3) * lado
+        yy, xx = np.mgrid[0:lado, 0:lado].astype(np.float32)
+        u = np.cos(a) * xx + np.sin(a) * yy + rng.normal(0, 1, lado).cumsum()[None, :] * R.uniform(0, 0.5)
+        v = 0.5 + 0.5 * np.sin(2 * np.pi * u / periodo + R.uniform(0, 6.3))
+        c1, c2 = color(), color()
+        f = c1 + v[..., None] * (c2 - c1)
+    else:                                            # textura real: una esquina de otra foto del dataset
+        im = rgb(R.choice(texturas)).astype(np.float32)
+        h, w = im.shape[:2]
+        s = int(min(h, w) * R.uniform(0.2, 0.35))
+        y0, x0 = R.choice([0, h - s]), R.choice([0, w - s])
+        f = cv2.resize(im[y0:y0 + s, x0:x0 + s], (lado, lado), interpolation=cv2.INTER_LINEAR)
+    f = f + rng.normal(0, R.uniform(1, 9), f.shape)
+    return np.clip(f, 0, 255)
+
+
+def cambiar_fondo(img, m, R, texturas):
+    """Pega la fruta (silueta m) sobre un fondo al azar, a veces con sombra; devuelve el cuadrado."""
+    img, m = cuadrar(img, 255), cuadrar(m, 0)
+    lado = img.shape[0]
+    f = fondo_al_azar(lado, R, texturas)
+    if R.random() < 0.5:                             # sombra suave desplazada
+        k = max(3, int(lado * 0.08)) | 1
+        dx, dy = (int(R.uniform(-0.06, 0.06) * lado) for _ in range(2))
+        s = cv2.GaussianBlur(np.roll(np.roll(m, dy, 0), dx, 1).astype(np.float32) / 255, (k, k), 0)
+        f = f * (1 - R.uniform(0.2, 0.5) * s[..., None])
+    alfa = cv2.GaussianBlur(m.astype(np.float32) / 255, (5, 5), 0)[..., None]
+    return np.clip(img * alfa + f * (1 - alfa), 0, 255).astype(np.uint8)
 
 
 class Fotos(Dataset):
-    def __init__(self, items, transform):
-        self.items, self.transform = items, transform
+    """items: (ruta, clase, silueta, transformación de la silueta). fondos: probabilidad de cambiar
+    el fondo (0 = nunca); fijo=True usa siempre el mismo fondo por foto (para validar)."""
+
+    def __init__(self, items, transform, fondos=0.0, texturas=(), fijo=False):
+        self.items, self.transform, self.fondos, self.texturas, self.fijo = items, transform, fondos, list(texturas), fijo
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, i):
-        ruta, y = self.items[i]
-        return self.transform(cargar(ruta)), y
+        ruta, y, silueta, como = self.items[i]
+        img = rgb(ruta)
+        R = random.Random(i) if self.fijo else random
+        if self.fondos and silueta and R.random() < self.fondos:
+            m = leer_silueta(silueta)
+            if m is not None and m.shape == img.shape[:2]:
+                img = cambiar_fondo(img, m[:, ::-1] if como == "espejo" else m, R, self.texturas)
+        return self.transform(Image.fromarray(cuadrar(img, 255))), y
 
 
 def transformaciones():
@@ -149,10 +256,13 @@ def metricas(p, y):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dataset", help="carpeta con train/ y test/ (6 subcarpetas cada una)")
-    ap.add_argument("--epocas", type=int, default=10)
+    ap.add_argument("--epocas", type=int, default=12)
     ap.add_argument("--lote", type=int, default=64)
+    ap.add_argument("--sin-fondos", action="store_true", help="no cambiar el fondo al entrenar")
+    ap.add_argument("--solo-evaluar", action="store_true",
+                    help="no entrena: mide y exporta el mejor punto de control ya guardado (mejor.pt)")
     ap.add_argument("--trabajo", default=os.path.join(RAIZ, "entrenamiento_frescura"),
-                    help="carpeta para la división y el mejor punto de control (no se sube a GitHub)")
+                    help="carpeta para la división, las siluetas y el mejor punto de control (no se sube a GitHub)")
     a = ap.parse_args()
     torch.manual_seed(7)
     random.seed(7)
@@ -164,34 +274,71 @@ def main():
     partes = dividir(grupos)
     with open(os.path.join(a.trabajo, "division.json"), "w", encoding="utf-8") as f:
         json.dump({k: [f"{c}/{b}" for c, b in v] for k, v in partes.items()}, f, ensure_ascii=False, indent=0)
+    carpeta_sil = os.path.join(a.trabajo, "siluetas")
+    calcular_siluetas(grupos, [x for v in partes.values() for x in v], carpeta_sil)
 
     def items(parte, solo_originales):
         out = []
         for c, b in partes[parte]:
+            sil = os.path.join(carpeta_sil, c, os.path.splitext(b)[0] + ".png")
             for nombre, ruta in grupos[(c, b)].items():
-                if not solo_originales or nombre == b:
-                    out.append((ruta, CLASES.index(c)))
+                if solo_originales and nombre != b:
+                    continue
+                prefijo = nombre[:len(nombre) - len(b)]
+                como = SILUETA_DE_COPIA.get(prefijo)
+                out.append((ruta, CLASES.index(c), sil if como else None, como))
         return out
 
     tr, ev = transformaciones()
     entrenamiento = items("entrenamiento", False)       # originales + copias: más variedad
     validacion = items("validacion", False)
+    val_orig = items("validacion", True)
     prueba = items("prueba", True)                     # solo las fotos originales: la medida honesta
     prueba_copias = items("prueba", False)
+    texturas = [r for r, *_ in items("entrenamiento", True)]
+    fondos = 0.0 if a.sin_fondos else PROB_FONDO
     print(f"Fotos originales: {len(grupos)} | entrenamiento {len(partes['entrenamiento'])} "
-          f"({len(entrenamiento)} con copias) | validación {len(partes['validacion'])} | prueba {len(prueba)}")
-
-    kw = dict(num_workers=min(8, os.cpu_count() or 2), pin_memory=disp.type == "cuda", persistent_workers=True)
-    c_tr = DataLoader(Fotos(entrenamiento, tr), a.lote, shuffle=True, drop_last=True, **kw)
-    c_va = DataLoader(Fotos(validacion, ev), 128, **kw)
+          f"({len(entrenamiento)} con copias) | validación {len(partes['validacion'])} | prueba {len(prueba)}"
+          f" | fondo cambiado: {fondos:.0%} de las fotos con silueta")
 
     modelo = crear_modelo().to(disp)
+    ruta_mejor = os.path.join(a.trabajo, "mejor.pt")
+    if not a.solo_evaluar:
+        entrenar(modelo, disp, a, Fotos(entrenamiento, tr, fondos, texturas), Fotos(validacion, ev),
+                 Fotos(val_orig, ev, 1.0, texturas, fijo=True), ruta_mejor)
+
+    # medir el mejor punto de control con la PRUEBA y exportarlo
+    modelo.load_state_dict(torch.load(ruta_mejor, map_location=disp))
+    res = {}
+    for nombre, ds in (("prueba_originales", Fotos(prueba, ev)), ("prueba_otros_fondos", Fotos(prueba, ev, 1.0, texturas, fijo=True)),
+                       ("prueba_con_copias", Fotos(prueba_copias, ev)), ("validacion", Fotos(validacion, ev))):
+        res[nombre] = metricas(*predecir(modelo, DataLoader(ds, 128, num_workers=2), disp))
+        print(f"{nombre}: fresco/podrido {res[nombre]['exactitud_fresco_podrido']:.3f} · 6 clases "
+              f"{res[nombre]['exactitud_6_clases']:.3f} (n={res[nombre]['n']})", flush=True)
+    exportar(modelo, {
+        "descripcion": "Red fresco/podrido (MobileNetV2, transferencia de aprendizaje, fondos cambiados al entrenar)",
+        "dataset": "Fruits fresh and rotten for classification (Kaggle: sriramr/fruits-fresh-and-rotten-for-classification)",
+        "clases": CLASES, "entrada": ENTRADA, "media": MEDIA, "desv": DESV, "relleno": [255, 255, 255],
+        "fotos_originales": len(grupos),
+        "division_por_foto_original": {k: len(v) for k, v in partes.items()},
+        "epocas": a.epocas, "fondos_cambiados": fondos, "fecha": date.today().isoformat(), "resultados": res,
+    })
+
+
+def entrenar(modelo, disp, a, ds_tr, ds_va, ds_vf, ruta_mejor):
+    """Entrena y guarda en ruta_mejor la época con mejor validación (fondo original y otros fondos)."""
+    # pocos procesos lectores: en Windows cada uno carga PyTorch entero (~0.6 GB de memoria)
+    lectores = min(6, os.cpu_count() or 2)
+    c_tr = DataLoader(ds_tr, a.lote, shuffle=True, drop_last=True, num_workers=lectores,
+                      pin_memory=disp.type == "cuda", persistent_workers=True)
+    c_va = DataLoader(ds_va, 128, num_workers=2)
+    c_vf = DataLoader(ds_vf, 128, num_workers=2)    # validación sobre otros fondos
     opt = torch.optim.AdamW(modelo.parameters(), lr=4e-4, weight_decay=1e-4)
     pasos = a.epocas * len(c_tr)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=4e-4, total_steps=pasos, pct_start=0.15)
     escala = torch.amp.GradScaler(enabled=disp.type == "cuda")
     perdida = nn.CrossEntropyLoss(label_smoothing=0.1)
-    mejor, ruta_mejor = -1.0, os.path.join(a.trabajo, "mejor.pt")
+    mejor = -1.0
 
     for ep in range(1, a.epocas + 1):
         modelo.train()
@@ -208,32 +355,24 @@ def main():
             total += l.item() * len(y)
             n += len(y)
         m = metricas(*predecir(modelo, c_va, disp))
-        print(f"época {ep:2d}  pérdida {total / n:.3f}  validación: 6 clases {m['exactitud_6_clases']:.3f} · "
-              f"fresco/podrido {m['exactitud_fresco_podrido']:.3f}  ({time.time() - t0:.0f} s)", flush=True)
-        if m["exactitud_fresco_podrido"] + m["exactitud_6_clases"] > mejor:
-            mejor = m["exactitud_fresco_podrido"] + m["exactitud_6_clases"]
+        mf = metricas(*predecir(modelo, c_vf, disp))
+        print(f"época {ep:2d}  pérdida {total / n:.3f}  validación fresco/podrido: fondo original "
+              f"{m['exactitud_fresco_podrido']:.3f} · otros fondos {mf['exactitud_fresco_podrido']:.3f} "
+              f"(6 clases {m['exactitud_6_clases']:.3f})  ({time.time() - t0:.0f} s)", flush=True)
+        nota = m["exactitud_fresco_podrido"] + mf["exactitud_fresco_podrido"] + 0.5 * m["exactitud_6_clases"]
+        if nota > mejor:
+            mejor = nota
             torch.save(modelo.state_dict(), ruta_mejor)
 
-    modelo.load_state_dict(torch.load(ruta_mejor, map_location=disp))
-    res = {}
-    for nombre, lista in (("prueba_originales", prueba), ("prueba_con_copias", prueba_copias), ("validacion", validacion)):
-        res[nombre] = metricas(*predecir(modelo, DataLoader(Fotos(lista, ev), 128, num_workers=4), disp))
-        print(f"{nombre}: 6 clases {res[nombre]['exactitud_6_clases']:.3f} · fresco/podrido "
-              f"{res[nombre]['exactitud_fresco_podrido']:.3f} (n={res[nombre]['n']})")
+    del c_tr, c_va, c_vf                             # cierra los procesos lectores antes de seguir
 
-    # exportar a ONNX (lo ejecuta OpenCV en el servidor, sin PyTorch)
+
+def exportar(modelo, info):
+    """Exporta a ONNX (lo ejecuta OpenCV en el servidor, sin PyTorch) y guarda los resultados."""
     modelo = modelo.float().cpu().eval()
     salida = os.path.join(RAIZ, "modelo_frescura.onnx")
     torch.onnx.export(modelo, torch.zeros(1, 3, ENTRADA, ENTRADA), salida, input_names=["imagen"],
                       output_names=["logits"], opset_version=13, dynamo=False)
-    info = {
-        "descripcion": "Segunda opinión fresco/podrido (MobileNetV2, transferencia de aprendizaje)",
-        "dataset": "Fruits fresh and rotten for classification (Kaggle: sriramr/fruits-fresh-and-rotten-for-classification)",
-        "clases": CLASES, "entrada": ENTRADA, "media": MEDIA, "desv": DESV, "relleno": [255, 255, 255],
-        "fotos_originales": len(grupos),
-        "division_por_foto_original": {k: len(v) for k, v in partes.items()},
-        "epocas": a.epocas, "fecha": date.today().isoformat(), "resultados": res,
-    }
     with open(os.path.join(RAIZ, "modelo_frescura.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
     print("Guardado:", salida, f"({os.path.getsize(salida) / 1e6:.1f} MB) y modelo_frescura.json")

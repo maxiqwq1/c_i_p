@@ -147,7 +147,7 @@
   .barra-colores i { display: block; height: 100%; }
   .colores-pie { display: grid; grid-template-columns: 1fr auto; gap: 14px; margin-top: 3px; color: var(--faint); font-size: .72rem; }
   .hud-paleta { flex: none; }
-  /* segunda opinión de la red neuronal: barra verde (fresco) que se llena de rojo (podrido) */
+  /* cómo se decidió el estado: barra verde (fresco) que se llena de rojo (probabilidad de podrido) */
   .red-fila { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-top: 6px; }
   .red-fila b { font-size: 1.02rem; white-space: nowrap; }
   .red-barra { display: block; height: 8px; border-radius: 4px; background: rgba(79, 211, 138, .55); overflow: hidden; }
@@ -444,8 +444,8 @@
       </div>
 
       <div id="red" class="colores" hidden>
-        <div class="m-et">Segunda opinión <span class="m-f">red neuronal</span></div>
-        <div class="red-fila"><b id="redVer">—</b><span class="red-barra" title="Probabilidad de podrido"><i id="redBar"></i></span></div>
+        <div class="m-et">Cómo se decidió el estado <span class="m-f">red neuronal + daño</span></div>
+        <div id="redFila" class="red-fila"><b id="redVer">—</b><span class="red-barra" title="Probabilidad de podrido según la red neuronal"><i id="redBar"></i></span></div>
         <div id="redNota" class="red-nota"></div>
       </div>
 
@@ -561,7 +561,7 @@
       <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
       <article><h3>6. Daño y madurez</h3><p class="f">A_daño ≈ Σ ΔA</p><p>El daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
       <article><h3>7. ¿Qué producto es?</h3><p>Cada fruta tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de frutas de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
-      <article><h3>8. Segunda opinión (red neuronal)</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle dice si se ve fresco o podrido. Es independiente del cálculo: si no coinciden, conviene revisar el producto. El estado lo sigue decidiendo el área dañada.</p></article>
+      <article><h3>8. Red neuronal + daño</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle calcula la probabilidad de que la fruta esté podrida: si es de 50 % o más, DESCARTE; entre 40 y 50 %, REGULAR; si la ve fresca, decide el daño medido. Así se detectan el moho y la piel arrugada, que no son manchas oscuras.</p></article>
     </div>
   </div>
 </dialog>
@@ -874,21 +874,28 @@ function pintarEstado(estado) {
   }
 }
 
-/** Segunda opinión de la red neuronal (solo manzana, banano y naranja). No cambia el estado. */
-function pintarRed(f, r) {
-  $("red").hidden = !f;
-  if (!f) { st.redSuav = null; return; }
-  const p = st.redSuav = st.modo === "camara" && st.redSuav != null ? 0.3 * f.podrido + 0.7 * st.redSuav : f.podrido;
-  const podrido = p >= 0.5;
-  $("redVer").textContent = `${podrido ? "Podrido" : "Fresco"} · ${Math.round(100 * Math.max(p, 1 - p))} %`;
-  $("redVer").style.color = podrido ? "var(--red)" : "var(--green)";
-  $("redBar").style.width = Math.round(100 * p) + "%";
-  let alerta = "";
-  if (!f.coincide_fruta) alerta = `La red cree que es ${f.fruta_red}: su opinión es menos fiable. `;
-  else if (podrido ? ["BUENO", "INMADURO"].includes(r.estado) : r.estado === "DESCARTE")
-    alerta = `No coincide con el cálculo de daño (${fmt(r.dano_pct, 1)} %): revise el producto. `;
-  $("redNota").innerHTML = (alerta ? `<b>${alerta}</b>` : "") +
-    `Probabilidad de podrido: ${Math.round(100 * p)} %. Aprendida de fotos reales de manzana, banano y naranja (Kaggle); no cambia el estado.`;
+/**
+ * Cómo se decidió el estado: la red neuronal (manzana, banano y naranja) junto con el daño medido.
+ * Podrido (P ≥ umbral alto) => DESCARTE; dudoso => al menos REGULAR; fresco => decide el daño.
+ * d: respuesta del servidor; s: valores estables que se muestran (en cámara, el estado más repetido).
+ */
+function pintarRed(d, s) {
+  if (!d) { $("red").hidden = true; st.redSuav = null; return; }
+  const f = d.frescura, r = d.resultados;
+  $("red").hidden = false;
+  $("redFila").hidden = !f;
+  let extra = "";
+  if (f) {
+    const p = st.redSuav = st.modo === "camara" && st.redSuav != null ? 0.3 * f.podrido + 0.7 * st.redSuav : f.podrido;
+    const [duda, alto] = f.umbrales;
+    const zona = p >= alto ? ["Podrido", "var(--red)"] : p >= duda ? ["Dudoso", "var(--amber)"] : ["Fresco", "var(--green)"];
+    $("redVer").textContent = `${zona[0]} · ${Math.round(100 * (p >= duda ? p : 1 - p))} %`;
+    $("redVer").style.color = zona[1];
+    $("redBar").style.width = Math.round(100 * p) + "%";
+    if (!f.coincide_fruta) extra = ` <b>La red cree que es ${f.fruta_red}: revise qué fruta es.</b>`;
+  } else st.redSuav = null;
+  const otro = r.estado_calculo && r.estado_calculo !== s.estado ? ` Solo con el daño sería <b>${r.estado_calculo}</b>.` : "";
+  $("redNota").innerHTML = (r.motivo || "") + otro + extra;
 }
 
 function mostrar(d) {
@@ -915,7 +922,7 @@ function mostrar(d) {
     $("reconocido").textContent = id >= 0 ? (como[rec0.metodo] || "Reconocido automáticamente") : "Reconociendo…";
   } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere ${nombre(d.reconocido_id)}`;
   pintarEstado(s.estado);
-  pintarRed(d.frescura, s);        // s: estado y daño estables (los que se muestran)
+  pintarRed(d, s);                 // s: estado y daño estables (los que se muestran)
 
   const curvo = r.metodo_volumen === "curvo", lamina = r.metodo_volumen === "lamina";
   $("t_dim").textContent = curvo ? "Largo sobre el arco × grosor" : lamina ? "Largo × ancho de la hoja" : "Largo × diámetro";
@@ -1173,7 +1180,7 @@ function guardarHistorial() {
 function descargarCsv() {
   if (!st.historial.length) { aviso("No hay capturas."); return; }
   const cols = ["fecha", "producto", "automatico", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3",
-                "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "red_veredicto", "red_podrido_pct"];
+                "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "estado_calculo", "red_veredicto", "red_podrido_pct"];
   const filas = [cols.join(";"), ...st.historial.map(h => cols.map(k => h[k] ?? "").join(";"))];
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["﻿" + filas.join("\r\n")], { type: "text/csv" }));

@@ -1,5 +1,5 @@
 {
- "descripcion": "Segunda opinión fresco/podrido (MobileNetV2, transferencia de aprendizaje)",
+ "descripcion": "Red fresco/podrido (MobileNetV2, transferencia de aprendizaje, fondos cambiados al entrenar)",
  "dataset": "Fruits fresh and rotten for classification (Kaggle: sriramr/fruits-fresh-and-rotten-for-classification)",
  "clases": [
   "freshapples",
@@ -31,11 +31,12 @@
   "validacion": 227,
   "prueba": 227
  },
- "epocas": 10,
- "fecha": "2026-11-26",
+ "epocas": 12,
+ "fondos_cambiados": 0.6,
+ "fecha": "2026-11-27",
  "resultados": {
   "prueba_originales": {
-   "exactitud_6_clases": 0.986784140969163,
+   "exactitud_6_clases": 0.9823788546255506,
    "exactitud_fresco_podrido": 0.9911894273127754,
    "podridas_detectadas": 0.9922480620155039,
    "frescas_bien": 0.9897959183673469,
@@ -85,17 +86,74 @@
      0,
      0,
      0,
+     2,
+     0,
+     32
+    ]
+   ]
+  },
+  "prueba_otros_fondos": {
+   "exactitud_6_clases": 0.9779735682819384,
+   "exactitud_fresco_podrido": 0.986784140969163,
+   "podridas_detectadas": 0.9922480620155039,
+   "frescas_bien": 0.9795918367346939,
+   "n": 227,
+   "matriz": [
+    [
+     35,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     32,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     29,
+     0,
+     0,
+     2
+    ],
+    [
      1,
      0,
-     33
+     0,
+     48,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     0,
+     46,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     2,
+     0,
+     32
     ]
    ]
   },
   "prueba_con_copias": {
-   "exactitud_6_clases": 0.9877630934899657,
-   "exactitud_fresco_podrido": 0.9916789035731767,
-   "podridas_detectadas": 0.9922480620155039,
-   "frescas_bien": 0.9909297052154195,
+   "exactitud_6_clases": 0.9833578071463533,
+   "exactitud_fresco_podrido": 0.990699951052374,
+   "podridas_detectadas": 0.9913867355727821,
+   "frescas_bien": 0.9897959183673469,
    "n": 2043,
    "matriz": [
     [
@@ -117,16 +175,16 @@
     [
      0,
      0,
-     271,
+     270,
      0,
      0,
-     8
+     9
     ],
     [
-     9,
+     8,
      0,
      0,
-     432,
+     433,
      0,
      0
     ],
@@ -141,25 +199,25 @@
     [
      0,
      0,
+     3,
+     14,
      0,
-     8,
-     0,
-     298
+     289
     ]
    ]
   },
   "validacion": {
-   "exactitud_6_clases": 0.9931473323543808,
-   "exactitud_fresco_podrido": 0.9936368086147822,
-   "podridas_detectadas": 0.9921875,
-   "frescas_bien": 0.9955106621773289,
+   "exactitud_6_clases": 0.9936368086147822,
+   "exactitud_fresco_podrido": 0.9946157611355849,
+   "podridas_detectadas": 0.9913194444444444,
+   "frescas_bien": 0.9988776655443322,
    "n": 2043,
    "matriz": [
     [
-     311,
+     314,
      0,
      0,
-     4,
+     1,
      0,
      0
     ],
@@ -198,10 +256,10 @@
     [
      0,
      0,
-     0,
      1,
+     2,
      0,
-     296
+     294
     ]
    ]
   }

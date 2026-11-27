@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+import frescura
 import reporte
 import vision
 from productos import PRODUCTOS
@@ -283,11 +284,11 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
         color = COLOR_ESTADO.get(suav["estado"], (90, 90, 90))
         cv2.rectangle(p, (18, y + 197), (18 + 240, y + 243), color, -1)
         textos.append((suav["estado"], (32, y + 201), 28, blanco))
-        red = r.get("frescura")          # segunda opinión de la red neuronal (manzana, banano, naranja)
+        red = r.get("frescura")          # la red neuronal (manzana, banano, naranja) decide junto con el daño
         if red:
             textos.append(("Red neuronal:", (276, y + 199), 15, gris))
-            textos.append((f"{red['veredicto']} {100 * red['confianza']:.0f} %", (276, y + 219), 20,
-                           (90, 90, 240) if red["veredicto"] == "Podrido" else (110, 210, 120)))
+            textos.append((frescura.texto(red), (276, y + 219), 17,
+                           {"Podrido": (90, 90, 240), "Dudoso": (60, 190, 240)}.get(red["veredicto"], (110, 210, 120))))
     y = 380
     escala = f"Escala: {px_por_cm:.1f} px/cm" + ("" if calibrado else "  (SIN CALIBRAR: K)")
     textos.append((escala, (18, y), 17, gris if calibrado else (60, 120, 255)))
@@ -337,13 +338,13 @@ def guardar_captura(frame, r):
         if nuevo:
             w.writerow(["fecha", "producto", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3",
                         "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "automatico",
-                        "red_veredicto", "red_podrido_pct"])
+                        "estado_calculo", "red_veredicto", "red_podrido_pct"])
         mad = "" if r["madurez_pct"] is None else f"{r['madurez_pct']:.1f}"
         red = r.get("frescura") or {}
         w.writerow([marca, r["producto"], f"{r['largo_cm']:.2f}", f"{r['diametro_cm']:.2f}",
                     f"{r['area_cm2']:.2f}", f"{r['volumen_cm3']:.1f}",
                     f"{r['area_dano_cm2']:.2f}", f"{r['dano_pct']:.1f}", mad, r["calibre"], r["estado"],
-                    "sí" if r["automatico"] else "no",
+                    "sí" if r["automatico"] else "no", r.get("estado_calculo", ""),
                     red.get("veredicto", ""), f"{100 * red['podrido']:.1f}" if red else ""])
     return ruta_rep
 

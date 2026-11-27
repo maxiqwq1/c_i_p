@@ -637,19 +637,21 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50, calibrado=
     px_dano = cv2.countNonZero(dano)
     dano_pct = 100.0 * px_dano / px_producto
     mad = madurez(hsv, interior, dano, producto)
-    estado, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"], med["largo_cm"])
-    # segunda opinión de la red neuronal (solo manzana, banano y naranja); no cambia el estado
-    segunda = frescura.evaluar(color, contorno, producto.nombre)
+    estado_calculo, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"], med["largo_cm"])
+    # la red neuronal (manzana, banano y naranja) decide junto con el daño medido (ver frescura.py)
+    red = frescura.evaluar(color, contorno, producto.nombre)
+    estado, motivo = frescura.decidir(estado_calculo, red, dano_pct, producto.nombre)
 
     med.update({
         "mascara": mascara, "contorno": contorno, "dano": dano,
         "Minv": Minv, "desplazamiento": desp, "angulo": angulo,
         "area_dano_cm2": px_dano / px_por_cm ** 2,     # suma doble de Riemann: cada píxel = (1/k)² cm²
         "dano_pct": dano_pct, "madurez_pct": mad,
-        "estado": estado, "calibre": calibre, "producto": producto.nombre,
+        "estado": estado, "estado_calculo": estado_calculo, "motivo": motivo,
+        "calibre": calibre, "producto": producto.nombre,
         "producto_id": PRODUCTOS.index(producto), "automatico": automatico,
         "reconocido_id": i_rec, "reconocimiento": info, "rasgos": rasgos,
         "colores": colores_dominantes(color, mascara),
-        "frescura": segunda,
+        "frescura": red,
     })
     return med
