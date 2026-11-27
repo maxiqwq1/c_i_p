@@ -11,6 +11,7 @@ La cámara observa la fruta y el programa calcula:
 | Volumen de un producto curvo | Discos perpendiculares al eje curvo | V = π ∫ r⊥(s)² ds = π ∫ₐᵇ r⊥(x)² √(1 + c′(x)²) dx |
 | Cálculo con píxeles | Suma de Riemann (Δx = 1 píxel) | A ≈ Σ [f(xᵢ) − g(xᵢ)] Δx |
 | Área dañada | Suma doble de Riemann (cada píxel = (1/k)² cm²) | A_daño ≈ Σ ΔA |
+| Comprobación de área y volumen | Teorema de Fubini (el orden de integración no cambia el resultado) | ∬_R F dA = ∫[∫F dy]dx = ∫[∫F dx]dy |
 
 Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre. En manzana, banano y naranja, una **red neuronal** entrenada con fotos reales decide el estado junto con el daño medido (ver *El estado: red neuronal + daño medido*).
 
@@ -64,6 +65,15 @@ Validación con bananos sintéticos de volumen y largo exactos:
 | Muy curvo (flecha 0.22) | +10.3 % | +3.4 % | 16.6 cm | 18.0 cm (18.0) |
 
 Con el flujo completo (detección + alineación + eje curvo), el error medio de volumen fue −1.8 % (banano maduro) y −0.2 % (banano verde).
+
+## Teorema de Fubini (en la lámina)
+Fubini dice que una integral doble se puede calcular como dos integrales seguidas, **en cualquier orden**: ∬_R F dA = ∫ₐᵇ[∫ F dy]dx = ∫_c^d[∫ F dx]dy. La integral de adentro recorre un *corte* de la región (una columna o una fila). La lámina de cada captura tiene una sección que lo comprueba con la fruta medida (`calculo.fubini`):
+
+1. **Área en los dos órdenes**: por columnas, ∫ₐᵇ[∫_{g(x)}^{f(x)} dy]dx = ∫(f − g)dx (lo que mide el programa), y por filas, ∫_c^d[largo del corte horizontal]dy. Dan exactamente lo mismo. Ojo con el **banano**: una fila horizontal lo cruza en **2 tramos**, y la integral de adentro es la suma de los dos, no "derecha − izquierda" (eso daría 69.2 cm² en vez de 51.3 cm² con la foto de ejemplo). Por eso el programa integra por columnas, a lo largo del eje.
+2. **Volumen: discos = capas cilíndricas**. En el plano (x, ρ) la región es 0 ≤ ρ ≤ r(x) y cada punto aporta 2πρ (el anillo de radio ρ). Integrando primero ρ salen los discos, ∫[∫₀^{r(x)} 2πρ dρ]dx = π∫r²dx; integrando primero x salen las capas, ∫₀^R 2πρ ℓ(ρ) dρ, con ℓ(ρ) = largo de la parte más gruesa que ρ. Así Fubini **justifica el método de discos**.
+3. **Volumen como integral doble sobre la silueta**: sobre cada punto de la foto el sólido tiene un grosor 2√(r² − v²) (v = distancia al eje), así que V = ∬ 2√(r² − v²) dA = ∫[∫_{−r}^{r} 2√(r² − v²) dv]dx = ∫ πr² dx (la integral de adentro es el área del círculo). Se suma con cuadritos de 1 píxel.
+
+Con las 7 fotos de la tabla, los tres volúmenes coinciden con una diferencia de 0.03 % como máximo (por ejemplo, naranja 250.7 cm³ por los tres caminos). En el banano (eje curvo) x pasa a ser s, la posición sobre el arco, y r pasa a ser r⊥.
 
 ## La tabla de colores: entrenamiento base
 La tabla *Configuración de colores en frutas y verduras* (`web/ejemplos/tabla-colores.jpg`) es la base del reconocimiento: "cada fruta y verdura tiene una combinación única de colores que permite identificarla".
@@ -147,7 +157,7 @@ La ruta es la carpeta que tiene `train` y `test`. Si el entrenamiento se corta a
 ## Teclas
 `0` reconocer automáticamente · `1-9` elegir producto (los primeros 9) · `N`/`P` producto siguiente/anterior · `E` enseñar ejemplo · `A` captura automática · `Z` zoom · `C`/`Espacio` capturar a mano · `K` calibrar · `B` fondo · `D` discos · `M` máscara · `Q`/`Esc` salir
 
-Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D y convergencia de Riemann) y una fila en `resultados.csv` (se abre con Excel).
+Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D, convergencia de Riemann y teorema de Fubini) y una fila en `resultados.csv` (se abre con Excel).
 
 ## Agregar otros productos
 Edite `productos.py` y agregue una ficha antes de *Genérico* (color de madurez, umbrales, calibre por diámetro o por largo, eje curvo si lo necesita, su paleta, y el perfil de reconocimiento: colores típicos, alargamiento, curvatura, saturación, brillo, palidez y diámetro). El cálculo de áreas y volúmenes es el mismo para cualquier producto. Si agrega su foto a `web/ejemplos/` y a `ejemplos.json`, corra `python entrenar_tabla.py` para que también sea un ejemplo de referencia.
@@ -161,7 +171,7 @@ Edite `productos.py` y agregue una ficha antes de *Genérico* (color de madurez,
 - Las pecas de un banano maduro son normales: en el banano solo cuentan como daño las manchas muy oscuras. En las zonas con poca luz el umbral de daño baja con la luz y se ignoran las grietas finas, así que solo cuentan las manchas grandes.
 
 ## Archivos
-- `calculo.py`: las integrales (área, volumen y sumas de Riemann)
+- `calculo.py`: las integrales (área, volumen, sumas de Riemann y la comprobación con el teorema de Fubini)
 - `vision.py`: detección automática, reconocimiento, alineación del eje, manchas, madurez y clasificación
 - `camara.py`: aplicación en vivo
 - `reporte.py`: lámina de gráficas

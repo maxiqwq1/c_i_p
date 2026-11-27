@@ -39,6 +39,119 @@ def colores_tabla(ax, r, y=0.2):
                    transform=ax.transAxes, edgecolors="white", linewidths=0.6, clip_on=False)
 
 
+def fubini(fig, gs, r):
+    """
+    Sección de la lámina con el TEOREMA DE FUBINI (ver calculo.fubini): el área y el volumen
+    de la captura calculados integrando en los dos órdenes, y el volumen como integral doble
+    sobre la silueta, dan el mismo resultado.
+    """
+    fb = calculo.fubini(r)
+    x, f, g = r["x_cm"], r["f_cm"], r["g_cm"]
+    L = x[-1] + 0.5 / r["px_por_cm"]
+    curvo = fb["curvo"]
+    vols = [fb["vol_discos"], fb["vol_capas"], fb["vol_doble"]]
+
+    # título de la sección, con la comprobación de esta captura
+    ax = fig.add_subplot(gs[2, :])
+    ax.axis("off")
+    ax.plot([0, 1], [1.1, 1.1], color="#bbb", lw=1, transform=ax.transAxes, clip_on=False)
+    ax.text(0.5, 0.9, "Teorema de Fubini: el orden de integración no cambia el resultado",
+            ha="center", va="center", fontsize=15, weight="bold", transform=ax.transAxes)
+    ax.text(0.5, 0.6, r"$\iint_R F\,dA=\int_a^b\left[\int_{g(x)}^{f(x)}F\,dy\right]dx"
+                       r"=\int_c^d\left[\int_{\mathrm{fila}\ y} F\,dx\right]dy$"
+                       "      la integral de adentro recorre un corte de la región: una columna o una fila",
+            ha="center", va="center", fontsize=12, transform=ax.transAxes)
+    comprobacion = f"Con esta captura:   área  {fb['area_columnas']:.2f} = {fb['area_filas']:.2f} cm²"
+    if vols[0] is not None:
+        dif = 100 * max(abs(v - vols[0]) for v in vols) / vols[0]
+        comprobacion += (f"      volumen  {vols[0]:.1f} = {vols[1]:.1f} = {vols[2]:.1f} cm³"
+                         f"  (discos, capas e integral doble; diferencia máxima {dif:.2f} %)")
+    ax.text(0.5, 0.32, comprobacion, ha="center", va="center", fontsize=12, color="#1a5276",
+            weight="bold", transform=ax.transAxes)
+
+    # 1. Área: primero por columnas (dy) o primero por filas (dx)
+    ax = fig.add_subplot(gs[3, 0])
+    ax.fill_between(x, g, f, color="#f5b041", alpha=0.35, lw=0)
+    ax.plot(x, f, color="#7e5109", lw=1)
+    ax.plot(x, g, color="#7e5109", lw=1)
+    a = L / 40                                     # ancho con que se dibujan la columna y la fila
+    ax.add_patch(Rectangle((fb["col_x"] - a / 2, fb["col_g"]), a, fb["col_f"] - fb["col_g"],
+                           fc="#c0392b", alpha=0.85, label="columna: primero ∫dy, de g(x) a f(x)"))
+    for i, (x0, x1) in enumerate(fb["fila_tramos"]):
+        ax.add_patch(Rectangle((x0, fb["fila_y"] - a / 2), x1 - x0, a, fc="#2471a3", alpha=0.85,
+                               label="fila: primero ∫dx, el largo del corte" if i == 0 else None))
+    ax.set_title("Área en los dos órdenes\n" +
+                 r"columnas: $\int_a^b\left[\int_{g(x)}^{f(x)}dy\right]dx$" + f" = {fb['area_columnas']:.2f} cm²\n" +
+                 r"filas: $\int_c^d\left[\int dx\right]dy$" + f" = {fb['area_filas']:.2f} cm²", fontsize=11)
+    nota = fb["fila_partida"] and fb["area_der_izq"] > 1.02 * fb["area_filas"]
+    if nota:          # banano: «derecha − izquierda» contaría el hueco entre los tramos
+        ax.text(0.5, 0.03, f"La fila azul cruza la silueta en {fb['fila_n_tramos']} tramos: se suman los tramos.\n"
+                f"Con «derecha − izquierda» saldría {fb['area_der_izq']:.1f} cm² (mal).",
+                ha="center", va="bottom", fontsize=8, transform=ax.transAxes,
+                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#2471a3", alpha=0.9))
+    ax.set_xlabel("x (cm)")
+    ax.set_ylabel("y (cm)")
+    ax.set_aspect("equal")
+    ax.legend(fontsize=8, loc="upper right", framealpha=0.85)
+    ax.grid(alpha=0.3)
+    ax.margins(y=0.35 if nota else 0.2)
+
+    if vols[0] is None:                            # hoja: no es un sólido de revolución
+        ax = fig.add_subplot(gs[3, 1:])
+        ax.axis("off")
+        ax.text(0.5, 0.5, r"Hoja (lámina de grosor $e$): $V=\iint_R e\,dA=e\int_a^b[f(x)-g(x)]\,dx=e\cdot A$",
+                ha="center", va="center", fontsize=13, transform=ax.transAxes)
+        return
+
+    # 2. Volumen en el plano (x, ρ): discos (primero ρ) = capas cilíndricas (primero x)
+    ax = fig.add_subplot(gs[3, 1])
+    p, w, R = fb["pos_cm"], fb["ancho_cm"], fb["r_cm"]
+    v, rr = ("s", r"r_\perp") if curvo else ("x", "r")
+    ax.fill_between(p, 0, R, color="#f5b041", alpha=0.35, lw=0)
+    ax.plot(p, R, color="#7e5109", lw=1.5, label=f"${rr}({v})$")
+    a = (p[-1] + w[-1] / 2) / 40
+    i = int(np.argmin(np.abs(p - 0.4 * (p[-1] + w[-1] / 2))))
+    ax.add_patch(Rectangle((p[i] - a / 2, 0), a, R[i], fc="#c0392b", alpha=0.85,
+                           label=r"disco: primero $\int d\rho$  →  $\pi " + rr + "^2$"))
+    rho1, hh = 0.55 * R.max(), R.max() / 22
+    for k, (i0, i1) in enumerate(calculo.tramos(R >= rho1)):
+        x0, x1 = p[i0] - w[i0] / 2, p[i1 - 1] + w[i1 - 1] / 2
+        ax.add_patch(Rectangle((x0, rho1 - hh / 2), x1 - x0, hh, fc="#2471a3", alpha=0.85,
+                               label=r"capa: primero $\int d" + v + r"$  →  $2\pi\rho\,\ell(\rho)$" +
+                               "\n" + r"$\ell(\rho)$ = largo de la barra azul" if k == 0 else None))
+    ax.set_title("Volumen: discos = capas cilíndricas\n" +
+                 r"discos: $\int\left[\int_0^{" + rr + "}2\\pi\\rho\\,d\\rho\\right]d" + v + r"=\pi\int " + rr + "^2\\,d" + v +
+                 f"$ = {vols[0]:.1f} cm³\n" +
+                 r"capas: $\int_0^R\left[\int_{" + rr + r"\geq\rho}2\pi\rho\,d" + v + r"\right]d\rho$" +
+                 f" = {vols[1]:.1f} cm³", fontsize=11)
+    ax.set_xlabel("s (cm, sobre el eje curvo)" if curvo else "x (cm)")
+    ax.set_ylabel("ρ (cm): distancia al eje")
+    ax.set_ylim(0, 1.75 * R.max())
+    ax.legend(fontsize=8, loc="upper right", framealpha=0.85)
+    ax.grid(alpha=0.3)
+
+    # 3. Volumen como integral doble sobre la silueta: grosor del sólido sobre cada punto.
+    #    Cada columna de la silueta (de g a f) se pinta con el grosor 2·R·√(1 − u²), u ∈ [−1, 1].
+    ax = fig.add_subplot(gs[3, 2])
+    paso = max(1, len(x) // 150)
+    u = np.linspace(-1, 1, 41)[:, None]
+    X = np.broadcast_to(x[::paso], (u.size, x[::paso].size))
+    Y = ((f + g) / 2)[::paso] + u * ((f - g) / 2)[::paso]
+    pc = ax.pcolormesh(X, Y, 2 * R[::paso] * np.sqrt(1 - u ** 2), shading="gouraud", cmap="YlOrRd")
+    fig.colorbar(pc, ax=ax, orientation="horizontal", shrink=0.6, pad=0.16, aspect=30,
+                 label="grosor del sólido sobre cada punto (cm)")
+    ax.plot(x, f, color="#7e5109", lw=1)
+    ax.plot(x, g, color="#7e5109", lw=1)
+    ax.set_title("Volumen: integral doble del grosor sobre la silueta\n" +
+                 r"$V=\iint 2\sqrt{" + rr + "^2-v^2}\\,dA=\\int\\left[\\int_{-" + rr + "}^{" + rr + "}2\\sqrt{" + rr +
+                 "^2-v^2}\\,dv\\right]d" + v + "$\n" +
+                 r"$=\pi\int " + rr + "^2\\,d" + v + f"$ = {vols[2]:.1f} cm³   (de adentro: el círculo)", fontsize=11)
+    ax.set_xlabel("x (cm)")
+    ax.set_ylabel("y (cm)")
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.3)
+
+
 def generar(imagen_bgr, r, ruta, n_rect=16):
     x, f, g, rad = r["x_cm"], r["f_cm"], r["g_cm"], r["r_cm"]
     L = r["x_cm"][-1] + 0.5 / r["px_por_cm"]           # largo sobre el eje x (cuerda)
@@ -47,8 +160,9 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     lamina = r.get("metodo_volumen") == "lamina"          # hoja (espinaca): V = área × grosor
     e = r.get("lamina_cm", 0.0)
 
-    fig = plt.figure(figsize=(17, 10))
-    gs = fig.add_gridspec(2, 3, hspace=0.32, wspace=0.25)
+    fig = plt.figure(figsize=(17, 17))
+    # filas 0-1: medidas; fila 2: título de la sección de Fubini; fila 3: Fubini
+    gs = fig.add_gridspec(4, 3, hspace=0.3, wspace=0.25, height_ratios=[1, 1, 0.42, 1], top=0.93)
 
     # 1. Captura (con zoom al producto)
     ax = fig.add_subplot(gs[0, 0])
@@ -217,6 +331,8 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
     ax.text(0.5, 0.04, r["estado"], fontsize=26, weight="bold", ha="center", color="white",
             transform=ax.transAxes,
             bbox=dict(boxstyle="round,pad=0.4", fc=COLOR_ESTADO.get(r["estado"], "#555")))
+
+    fubini(fig, gs, r)
 
     fig.suptitle("Inspección automatizada de productos agrícolas — Cálculo Integral (áreas y volúmenes)",
                  fontsize=15, weight="bold")
