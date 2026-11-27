@@ -1066,10 +1066,10 @@ async function capturar(automatica = false) {
     }
     const r = JSON.parse(resp.headers.get("X-Resultados") || "null");
     const url = URL.createObjectURL(await resp.blob());
-    const marca = new Date().toISOString().slice(0, 19).replace(/[-:]/g, "").replace("T", "_");
+    const marca = marcaLocal(new Date());                 // hora de este equipo (no UTC)
     st.laminas.set(marca, url);
     if (st.laminas.size > 30) { const [vieja] = st.laminas.keys(); URL.revokeObjectURL(st.laminas.get(vieja)); st.laminas.delete(vieja); }
-    if (r) { st.historial.push({ fecha: marca, ...r }); guardarHistorial(); }
+    if (r) { st.historial.push({ fecha: marca, local: true, ...r }); guardarHistorial(); }
     $("ultima").hidden = false; $("ultimaImg").src = url; $("ultima").dataset.fecha = marca;
     $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³<br>
       <span style="color:var(--faint)">${automatica ? "Captura automática" : "Captura manual"} · toque para ver la lámina</span>` : "";
@@ -1085,7 +1085,8 @@ function verLamina(fecha) {
   if (!url) { aviso("La lámina de esta captura ya no está en memoria (solo se guardan los datos)."); return; }
   const h = st.historial.find(x => x.fecha === fecha);
   $("dlgTitulo").textContent = h ? `Lámina de cálculo · ${h.producto}` : "Lámina de cálculo";
-  $("lamina").src = url; $("descargar").href = url; $("descargar").download = `reporte_${fecha}.png`;
+  const d = h ? fechaDe(h) : null;
+  $("lamina").src = url; $("descargar").href = url; $("descargar").download = `reporte_${d ? marcaLocal(d) : fecha}.png`;
   $("dlg").showModal();
 }
 
@@ -1172,11 +1173,30 @@ function mostrarConteo() {
 }
 
 // ---------------------------------------------------------------- historial
+const dos = n => String(n).padStart(2, "0");
+/** Marca de una captura con la hora de este equipo: AAAAMMDD_hhmmss. */
+const marcaLocal = d => `${d.getFullYear()}${dos(d.getMonth() + 1)}${dos(d.getDate())}_${dos(d.getHours())}${dos(d.getMinutes())}${dos(d.getSeconds())}`;
+/** Fecha de una captura. Las capturas viejas (sin "local") guardaban la marca en UTC: se convierte a la hora de aquí. */
+function fechaDe(h) {
+  const m = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})$/.exec(h.fecha || "");
+  if (!m) return null;
+  const [Y, M, D, hh, mm, ss] = m.slice(1).map(Number);
+  return h.local ? new Date(Y, M - 1, D, hh, mm, ss) : new Date(Date.UTC(Y, M - 1, D, hh, mm, ss));
+}
+/** Hora para la tabla; si la captura no es de hoy, también el día. */
+function horaDe(h) {
+  const d = fechaDe(h);
+  if (!d) return "—";
+  const hoy = new Date().toDateString() === d.toDateString();
+  return (hoy ? "" : `${dos(d.getDate())}/${dos(d.getMonth() + 1)} `) + `${dos(d.getHours())}:${dos(d.getMinutes())}`;
+}
+const textoFecha = h => { const d = fechaDe(h); return d ? `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())} ${dos(d.getHours())}:${dos(d.getMinutes())}:${dos(d.getSeconds())}` : ""; };
+
 function guardarHistorial() {
   localStorage.historial = JSON.stringify(st.historial);
   $("nCapt").textContent = st.historial.length;
   $("tabla").innerHTML = st.historial.slice().reverse().map(h => `<tr class="${st.laminas.has(h.fecha) ? "ver" : ""}" data-fecha="${h.fecha}">
-    <td>${h.fecha.slice(9, 11)}:${h.fecha.slice(11, 13)}</td><td>${h.producto}</td>
+    <td>${horaDe(h)}</td><td>${h.producto}</td>
     <td>${fmt(h.area_cm2, 1)}</td><td>${fmt(h.volumen_cm3, 0)}</td>
     <td><span class="pill" style="background:${COLOR_ESTADO[h.estado] || ""}">${h.estado}</span></td></tr>`).join("")
     || `<tr><td colspan="5" class="vacia">Las láminas aparecerán aquí al capturar.</td></tr>`;
@@ -1186,7 +1206,7 @@ function descargarCsv() {
   if (!st.historial.length) { aviso("No hay capturas."); return; }
   const cols = ["fecha", "producto", "automatico", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3",
                 "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "estado_calculo", "red_veredicto", "red_podrido_pct"];
-  const filas = [cols.join(";"), ...st.historial.map(h => cols.map(k => h[k] ?? "").join(";"))];
+  const filas = [cols.join(";"), ...st.historial.map(h => cols.map(k => k === "fecha" ? textoFecha(h) : h[k] ?? "").join(";"))];
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["﻿" + filas.join("\r\n")], { type: "text/csv" }));
   a.download = "resultados.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
