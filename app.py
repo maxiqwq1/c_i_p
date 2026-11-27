@@ -69,7 +69,10 @@ def leer_ejemplos(texto, maximo=300):
     validos = []
     for e in datos[:maximo] if isinstance(datos, list) else []:
         try:
-            # el nombre manda (si se agregan productos, los índices cambian); el índice es respaldo
+            # el nombre manda (si se agregan o quitan productos, los índices cambian); el índice es
+            # respaldo. Un nombre que ya no existe (producto quitado) se descarta.
+            if e.get("nombre") and e["nombre"] not in por_nombre:
+                continue
             i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
             r = e["rasgos"]
             rasgos = {"hist": [float(v) for v in r["hist"]], "calibrado": bool(r.get("calibrado")),

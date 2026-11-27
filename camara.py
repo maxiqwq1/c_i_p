@@ -91,11 +91,14 @@ def cargar_ejemplos():
             datos = json.load(fh)
     except (OSError, ValueError):
         return []
-    # el nombre manda (si se agregan productos, los índices cambian); el índice es respaldo
+    # el nombre manda (si se agregan o quitan productos, los índices cambian); el índice es
+    # respaldo. Un nombre que ya no existe (producto quitado) se descarta.
     por_nombre = {p.nombre: i for i, p in enumerate(PRODUCTOS)}
     ejemplos = []
     for e in datos if isinstance(datos, list) else []:
         try:
+            if e.get("nombre") and e["nombre"] not in por_nombre:
+                continue
             i = por_nombre[e["nombre"]] if e.get("nombre") in por_nombre else int(e["producto"])
             if 0 <= i < len(PRODUCTOS) and len(e["rasgos"]["hist"]) == 18:
                 ejemplos.append({**e, "producto": i})

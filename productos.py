@@ -1,9 +1,10 @@
 """
 Fichas de producto (frutas y verduras).
 
-Los 16 productos y sus PALETAS vienen de la tabla "Configuración de colores en
-frutas y verduras" (web/ejemplos/tabla-colores.jpg): cada producto tiene una
-combinación de colores que ayuda a identificarlo. Las fotos de esa tabla son
+Los productos y sus PALETAS vienen de la tabla "Configuración de colores en
+frutas y verduras" (web/ejemplos/tabla-colores.jpg): 14 de sus 16 productos (el
+tomate y el aguacate no se incluyen). Cada producto tiene una combinación de
+colores que ayuda a identificarlo. Las fotos de esa tabla son
 también el ENTRENAMIENTO BASE del reconocimiento (ver entrenar_tabla.py).
 
 Para inspeccionar un producto nuevo solo hay que agregar una ficha a la lista
@@ -30,9 +31,9 @@ dentro del rango y baja suavemente fuera de él:
   solidez       (min, max) área / envolvente convexa: 1 = convexo; un manojo de hojas, ~0.85.
                 En los tres anteriores, None = no importa.
   saturacion    (min, max) de la saturación mediana (0-255): qué tan "vivo" es el color.
-  brillo        (min, max) del brillo mediano (0-255): aguacate y pepino son oscuros.
+  brillo        (min, max) del brillo mediano (0-255): pepino y espinaca son oscuros.
   palidez       (min, max) fracción de piel casi sin color (cebolla blanca, papa).
-  oscuro        (min, max) fracción de piel casi negra (aguacate Hass maduro).
+  oscuro        (min, max) fracción de piel casi negra (una papa sana casi no tiene).
   palido        True: los colores se miden también en la piel poco saturada.
   diametro      (min, max) en cm (grosor). Solo cuenta si la cámara está CALIBRADA, y
                 solo ayuda: no puede descartar el producto (la escala puede no
@@ -53,9 +54,6 @@ guarde 2-3 ejemplos reales de cada producto y el programa los usa primero
 (vecino más cercano).
 """
 from dataclasses import dataclass, field
-
-ROJO = [(0, 8), (165, 179)]
-
 
 @dataclass
 class Producto:
@@ -95,12 +93,6 @@ PRODUCTOS = [
              paleta=["#fc6b01", "#fd9102", "#fec327", "#fedf71"],
              colores=[(9, 20, 1.0), (20, 26, 0.5), (26, 45, 0.25)],
              alargamiento=(1.0, 1.12), saturacion=(200, 255), diametro=(5.5, 10.5)),
-    # Tomate: rojo-naranja. El rojo carmesí (172-179) indica un poco más manzana que tomate.
-    Producto("Tomate", 0.98, ROJO,
-             calibres=[("Grande", 7.0), ("Mediano", 5.5), ("Pequeño", 0.0)],
-             paleta=["#ec1701", "#f2421c", "#fe8655", "#fdba7f"],
-             colores=[(0, 7, 1.0), (172, 179, 0.9), (168, 172, 0.7), (7, 13, 0.6), (35, 70, 0.3)],
-             alargamiento=(1.0, 1.25), saturacion=(160, 255), diametro=(2.0, 8.0)),
     # Limón amarillo (alargado, con puntas) o lima / limón verde (más redondo y pequeño)
     Producto("Limón", 0.95, [(22, 60)],
              calibres=[("Grande", 5.5), ("Mediano", 4.5), ("Pequeño", 0.0)],
@@ -136,18 +128,6 @@ PRODUCTOS = [
              colores=[(18, 34, 1.0), (34, 48, 0.9), (12, 18, 0.4)],
              alargamiento=(2.0, 6.5), curvatura=(0.06, 0.4), saturacion=(90, 255), brillo=(120, 255),
              diametro=(2.6, 4.8)),
-    # Aguacate: común (verde brillante) o Hass (casi negro o café oscuro al madurar). Forma de
-    # huevo o pera. La piel rugosa del Hass tiene grietas oscuras: solo cuenta como daño lo muy oscuro.
-    Producto("Aguacate", 1.00, None, factor_oscuro=0.25,
-             calibres=[("Grande", 9.0), ("Mediano", 7.0), ("Pequeño", 0.0)],
-             paleta=["#5a6201", "#5b730b", "#9c9155", "#683e21"],
-             saturacion=(40, 230), asimetria=(0.0, 0.4), extension=(0.74, 0.86),
-             variantes=[
-                 {"colores": [(30, 45, 0.6), (45, 75, 1.0)], "alargamiento": (1.15, 1.9),
-                  "brillo": (35, 170), "diametro": (6.0, 13.0)},
-                 {"colores": [(25, 90, 0.8), (120, 179, 0.8), (0, 25, 0.7)], "alargamiento": (1.1, 1.7),
-                  "brillo": (0, 110), "oscuro": (0.15, 1.0), "diametro": (5.0, 9.5)},
-             ]),
     # ------------------------------------------------------------------ verduras
     Producto("Papa", 1.08, None, categoria="Verdura",
              calibres=[("Primera", 6.0), ("Segunda", 4.5), ("Tercera", 0.0)],
@@ -181,7 +161,7 @@ PRODUCTOS = [
              alargamiento=(2.2, 6.0), curvatura=(0.0, 0.12), saturacion=(60, 230), brillo=(40, 150),
              diametro=(2.5, 6.5)),
     # Pimiento (pimentón) rojo o verde. Es HUECO: su densidad efectiva (peso / volumen
-    # de la silueta) es la mitad de la de un tomate.
+    # de la silueta) es la mitad de la de un producto macizo.
     Producto("Pimiento", 0.50, [(0, 30), (165, 179)], categoria="Verdura",
              calibres=[("Grande", 8.0), ("Mediano", 6.5), ("Pequeño", 0.0)],
              paleta=["#e00200", "#c91102", "#357702", "#498203"],

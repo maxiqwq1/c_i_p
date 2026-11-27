@@ -11,14 +11,6 @@
    "medida": "largo"
   },
   {
-   "clave": "tomate",
-   "nombre": "Tomate",
-   "foto": "tomate.jpg",
-   "px_por_cm": 38.8,
-   "largo_cm": 7.5,
-   "medida": "largo"
-  },
-  {
    "clave": "limon",
    "nombre": "Limón",
    "foto": "limon.jpg",
@@ -57,14 +49,6 @@
    "px_por_cm": 30.44,
    "largo_cm": 16.0,
    "medida": "largo sobre el arco"
-  },
-  {
-   "clave": "aguacate",
-   "nombre": "Aguacate",
-   "foto": "aguacate.jpg",
-   "px_por_cm": 31.2,
-   "largo_cm": 10.0,
-   "medida": "largo"
   },
   {
    "clave": "papa",

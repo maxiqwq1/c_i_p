@@ -485,7 +485,7 @@
       <details class="plegable">
         <summary><svg class="i"><use href="#i-chispa"/></svg>Enseñar al reconocedor<span id="ejResumen" class="resumen"></span></summary>
         <div class="cuerpo">
-          <p class="nota">Ya viene entrenado con las 16 fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button>. Si con su cámara confunde productos, póngalo frente a ella, elija qué es y pulse <b>Guardar ejemplo</b>: con 2-3 ejemplos de cada uno aprende sus productos y su luz.</p>
+          <p class="nota">Ya viene entrenado con las fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button>. Si con su cámara confunde productos, póngalo frente a ella, elija qué es y pulse <b>Guardar ejemplo</b>: con 2-3 ejemplos de cada uno aprende sus productos y su luz.</p>
           <div class="ensenar">
             <select id="ensenarProd" aria-label="Producto a enseñar"></select>
             <button id="btnEnsenar" class="btn pequeno">Guardar ejemplo <kbd>E</kbd></button>
@@ -549,7 +549,7 @@
       <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
       <article><h3>6. Peso, daño y madurez</h3><p class="f">m = ρ V,  A_daño ≈ Σ ΔA</p><p>El peso usa la densidad de cada producto; el daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
       <article><h3>7. Hojas (espinaca)</h3><p class="f">V = e · A = e ∫ₐᵇ [f(x) − g(x)] dx</p><p>Una hoja no es un sólido de revolución sino una lámina delgada: su volumen es el área entre curvas por el grosor e (0.5 mm).</p></article>
-      <article><h3>8. ¿Qué producto es?</h3><p>Cada fruta y verdura tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las 16 fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
+      <article><h3>8. ¿Qué producto es?</h3><p>Cada fruta y verdura tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
     </div>
   </div>
 </dialog>
@@ -563,8 +563,8 @@
     <figure class="tabla-fig" style="margin:0">
       <img src="/ejemplos/tabla-colores.jpg" width="1536" height="1024" loading="lazy"
            alt="Tabla de configuración de colores en frutas y verduras: 16 productos con su foto y sus 4 colores típicos">
-      <figcaption>De esta tabla salen los 16 productos, la paleta de 4 colores de cada uno y las fotos de ejemplo con que se
-        entrena el reconocimiento (entrenar_tabla.py). Toque un producto de la galería para analizar su foto.</figcaption>
+      <figcaption>De esta tabla salen los productos (14 de los 16: el tomate y el aguacate no se incluyen), la paleta de
+        4 colores de cada uno y las fotos de ejemplo con que se entrena el reconocimiento (entrenar_tabla.py). Toque un producto de la galería para analizar su foto.</figcaption>
     </figure>
   </div>
 </dialog>
@@ -1043,6 +1043,7 @@ function mostrarEscala() {
 function elegirProducto(i) {
   if (i < -1 || i >= st.productos.length) return;
   st.producto = i; localStorage.producto = i; $("producto").value = i;
+  if (i >= 0) localStorage.productoNombre = nombre(i); else localStorage.removeItem("productoNombre");
   if (i >= 0) $("ensenarProd").value = i;          // lo elegido a mano es lo que se suele enseñar
   reiniciarPresencia(); analizarUnaVez();
 }
@@ -1072,7 +1073,7 @@ function mostrarConteo() {
   const txt = Object.entries(c).map(([n, k]) => `${n} ${k}`).join(" · ");
   $("ejResumen").textContent = st.ejemplos.length ? `${st.ejemplos.length} ejemplos` : "";
   $("conteo").innerHTML = txt ? `Guardados: ${txt}. <button id="btnOlvidarEj" class="enlace">Borrar ejemplos</button>`
-                              : "Sin ejemplos propios: reconoce con las 16 fotos de la tabla de colores y el perfil de cada producto.";
+                              : "Sin ejemplos propios: reconoce con las fotos de la tabla de colores y el perfil de cada producto.";
   const b = $("btnOlvidarEj");
   if (b) b.onclick = () => { st.ejemplos = []; localStorage.removeItem("ejemplos"); st.votos = {}; mostrarConteo(); analizarUnaVez();
                              aviso("Ejemplos borrados."); };
@@ -1155,11 +1156,15 @@ document.addEventListener("keydown", e => {
   }).join("");
   $("producto").innerHTML = `<option value="-1">Automático (reconocer)</option>` +
     grupos(p => `<option value="${p.id}">${p.id < 9 ? (p.id + 1) + ". " : ""}${p.nombre}</option>`);
-  if (st.producto >= st.productos.length || st.producto < -1 || Number.isNaN(st.producto)) st.producto = -1;
+  // el nombre manda: si se quitan productos, los índices cambian (sin nombre guardado: automático)
+  const porNombre = Object.fromEntries(st.productos.map(p => [p.nombre, p.id]));
+  st.producto = porNombre[localStorage.productoNombre] ?? -1;
   $("producto").value = st.producto;
   $("ensenarProd").innerHTML = grupos(p => `<option value="${p.id}">${p.nombre}</option>`);
   if (st.producto >= 0) $("ensenarProd").value = st.producto;
-  st.ejemplos = st.ejemplos.filter(e => e.producto < st.productos.length);
+  st.ejemplos = st.ejemplos.filter(e => e.nombre ? e.nombre in porNombre : e.producto < st.productos.length)
+                           .map(e => e.nombre ? { ...e, producto: porNombre[e.nombre] } : e);
+  localStorage.ejemplos = JSON.stringify(st.ejemplos);
   mostrarConteo();
   const q = new URLSearchParams(location.search).get("ejemplo");      // p. ej. /?ejemplo=banano
   if (q) cargarEjemplo(q);

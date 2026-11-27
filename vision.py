@@ -285,11 +285,11 @@ def detectar_danos(frame, mascara, producto):
         return np.zeros_like(mascara), interior, hsv
     V = hsv[..., 2]
     esperado = iluminacion(V, interior > 0)
-    # En pieles oscuras (aguacate Hass, pepino) las grietas y rayas naturales ya son muy oscuras:
+    # En pieles oscuras (pepino) las grietas y rayas naturales ya son muy oscuras:
     # allí el umbral baja con la luz que llega y solo cuenta lo casi negro.
     factor = producto.factor_oscuro * np.clip(esperado / 120.0, 0.5, 1.0)
     dano = ((V < factor * esperado) & (interior > 0)).astype(np.uint8) * 255
-    # se quitan puntos y grietas finas (poros, rugosidad del Hass): una mancha real es un parche
+    # se quitan puntos y grietas finas (poros, rugosidad de la piel): una mancha real es un parche
     lado = max(3, int(round(0.015 * diam)) | 1)
     dano = cv2.morphologyEx(dano, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (lado, lado)))
     return dano, interior, hsv
@@ -304,7 +304,7 @@ RUTA_TABLA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entrenami
 
 def cargar_ejemplos_tabla(ruta=RUTA_TABLA):
     """
-    Entrenamiento base: los rasgos de las 16 fotos de la tabla de colores
+    Entrenamiento base: los rasgos de las fotos de la tabla de colores
     (los genera entrenar_tabla.py). Se usan como ejemplos de referencia.
     """
     try:
@@ -399,7 +399,7 @@ def calcular_rasgos(hsv, mascara, med, calibrado, contorno=None):
       hist        histograma de tonos de la piel con color (18 grupos de 10 unidades de hue)
       hist_suave  igual, pero contando también la piel poco saturada (papa, cebolla blanca)
       palidez     fracción de piel casi sin color (blanca, gris, beige)
-      oscuro      fracción de piel casi negra (aguacate Hass maduro)
+      oscuro      fracción de piel casi negra
       sat/val     saturación (de la piel con color) y brillo medianos (0-255)
       sat_global  saturación mediana de toda la piel (para productos pálidos)
       alarg       eje mayor / eje menor de la elipse equivalente (momentos de segundo orden)
@@ -538,7 +538,7 @@ def reconocer(rasgos, ejemplos=None, tabla=True):
     Decide qué producto es.
       1) Si hay EJEMPLOS enseñados y alguno se parece lo suficiente (vecino más cercano),
          gana ese: aprende las frutas y la luz reales del usuario.
-      2) Si se parece mucho a una de las 16 fotos de la TABLA de colores (entrenamiento base), esa.
+      2) Si se parece mucho a una de las fotos de la TABLA de colores (entrenamiento base), esa.
       3) Si no, REGLAS: el perfil de cada ficha (productos.py), ajustado con esas mismas fotos.
       4) Si nada coincide: "Genérico".
     Devuelve (índice, info) con el método usado y los 3 mejores candidatos (para explicar la decisión).
