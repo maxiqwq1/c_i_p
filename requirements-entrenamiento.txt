@@ -1,0 +1,7 @@
+# Solo para entrenar la red fresco/podrido (entrenar_frescura.py). La página NO lo necesita.
+# Con tarjeta NVIDIA:  pip install -r requirements-entrenamiento.txt --index-url https://download.pytorch.org/whl/cu126 --extra-index-url https://pypi.org/simple
+torch
+torchvision
+onnx
+numpy
+pillow

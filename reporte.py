@@ -195,16 +195,21 @@ def generar(imagen_bgr, r, ruta, n_rect=16):
         ("Área de la silueta", f"{r['area_cm2']:.2f} cm²"),
         ("Volumen (lámina)" if lamina else "Volumen (eje curvo)" if curvo else "Volumen (discos)",
          f"{r['volumen_cm3']:.1f} cm³"),
-        ("Peso estimado", f"{r['peso_g']:.0f} g"),
         ("Área dañada", f"{r['area_dano_cm2']:.2f} cm²  ({r['dano_pct']:.1f} %)"),
         ("Madurez (color)", mad),
         ("Calibre", r["calibre"]),
         ("Escala", f"{r['px_por_cm']:.1f} px/cm"),
     ]
+    red = r.get("frescura")
+    if red:   # segunda opinión de la red neuronal (no cambia el estado)
+        filas.append(("Red neuronal", f"{red['veredicto']} {100 * red['confianza']:.0f} %"))
+    paso = 0.075 if len(filas) <= 10 else 0.068
     for i, (k, v) in enumerate(filas):
-        y = 0.95 - i * 0.075
+        y = 0.95 - i * paso
         ax.text(0.0, y, k, fontsize=12, color="#444", transform=ax.transAxes)
-        ax.text(0.55, y, v, fontsize=12, weight="bold", transform=ax.transAxes)
+        color = ({"Fresco": "#1e8449", "Podrido": "#c0392b"}.get(red["veredicto"])
+                 if k.startswith("Red neuronal") else "black")
+        ax.text(0.55, y, v, fontsize=12, weight="bold", color=color, transform=ax.transAxes)
     colores_tabla(ax, r)
     ax.text(0.5, 0.04, r["estado"], fontsize=26, weight="bold", ha="center", color="white",
             transform=ax.transAxes,

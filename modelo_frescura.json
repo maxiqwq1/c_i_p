@@ -1,0 +1,209 @@
+{
+ "descripcion": "Segunda opinión fresco/podrido (MobileNetV2, transferencia de aprendizaje)",
+ "dataset": "Fruits fresh and rotten for classification (Kaggle: sriramr/fruits-fresh-and-rotten-for-classification)",
+ "clases": [
+  "freshapples",
+  "freshbanana",
+  "freshoranges",
+  "rottenapples",
+  "rottenbanana",
+  "rottenoranges"
+ ],
+ "entrada": 224,
+ "media": [
+  0.485,
+  0.456,
+  0.406
+ ],
+ "desv": [
+  0.229,
+  0.224,
+  0.225
+ ],
+ "relleno": [
+  255,
+  255,
+  255
+ ],
+ "fotos_originales": 1511,
+ "division_por_foto_original": {
+  "entrenamiento": 1057,
+  "validacion": 227,
+  "prueba": 227
+ },
+ "epocas": 10,
+ "fecha": "2026-11-26",
+ "resultados": {
+  "prueba_originales": {
+   "exactitud_6_clases": 0.986784140969163,
+   "exactitud_fresco_podrido": 0.9911894273127754,
+   "podridas_detectadas": 0.9922480620155039,
+   "frescas_bien": 0.9897959183673469,
+   "n": 227,
+   "matriz": [
+    [
+     35,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     32,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     30,
+     0,
+     0,
+     1
+    ],
+    [
+     1,
+     0,
+     0,
+     48,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     0,
+     46,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     1,
+     0,
+     33
+    ]
+   ]
+  },
+  "prueba_con_copias": {
+   "exactitud_6_clases": 0.9877630934899657,
+   "exactitud_fresco_podrido": 0.9916789035731767,
+   "podridas_detectadas": 0.9922480620155039,
+   "frescas_bien": 0.9909297052154195,
+   "n": 2043,
+   "matriz": [
+    [
+     315,
+     0,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     288,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     271,
+     0,
+     0,
+     8
+    ],
+    [
+     9,
+     0,
+     0,
+     432,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     0,
+     414,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     8,
+     0,
+     298
+    ]
+   ]
+  },
+  "validacion": {
+   "exactitud_6_clases": 0.9931473323543808,
+   "exactitud_fresco_podrido": 0.9936368086147822,
+   "podridas_detectadas": 0.9921875,
+   "frescas_bien": 0.9955106621773289,
+   "n": 2043,
+   "matriz": [
+    [
+     311,
+     0,
+     0,
+     4,
+     0,
+     0
+    ],
+    [
+     0,
+     297,
+     0,
+     0,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     279,
+     0,
+     0,
+     0
+    ],
+    [
+     9,
+     0,
+     0,
+     432,
+     0,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     0,
+     414,
+     0
+    ],
+    [
+     0,
+     0,
+     0,
+     1,
+     0,
+     296
+    ]
+   ]
+  }
+ }
+}

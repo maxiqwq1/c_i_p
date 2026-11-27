@@ -15,3 +15,6 @@ capturas/resultados.csv
 
 # Ejemplos enseñados al reconocedor (propios de cada equipo)
 entrenamiento.json
+
+# Entrenamiento de la red fresco/podrido (división y puntos de control; el dataset va fuera del proyecto)
+entrenamiento_frescura/

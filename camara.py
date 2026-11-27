@@ -6,7 +6,7 @@ imagen y sobre cualquier fondo liso o de un color distinto al producto
 (mesa, mantel, hoja...). El programa:
   - reconoce qué producto es, fruta o verdura (o elíjalo a mano con 1-9 / N / P),
   - hace zoom sobre él,
-  - calcula en tiempo real área (∫(f−g)dx), volumen (π∫r²dx), peso, % de daño,
+  - calcula en tiempo real área (∫(f−g)dx), volumen (π∫r²dx), % de daño,
     madurez y estado,
   - y cuando el producto se queda quieto ~1 s guarda la captura automáticamente.
 
@@ -241,7 +241,6 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
         lineas = [
             f"Área  ∫(f−g)dx  = {suav['area_cm2']:.1f} cm²",
             f"Volumen  {formula} = {suav['volumen_cm3']:.0f} cm³",
-            f"Peso estimado = {suav['peso_g']:.0f} g",
             (f"Largo (arco) × grosor = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"
              if r.get("metodo_volumen") == "curvo" else
              f"Largo × diámetro = {suav['largo_cm']:.1f} × {suav['diametro_cm']:.1f} cm"),
@@ -252,8 +251,13 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
         for i, t in enumerate(lineas):
             textos.append((t, (18, y + i * 31), 21, blanco))
         color = COLOR_ESTADO.get(r["estado"], (90, 90, 90))
-        cv2.rectangle(p, (18, y + 228), (18 + 240, y + 274), color, -1)
-        textos.append((r["estado"], (32, y + 232), 28, blanco))
+        cv2.rectangle(p, (18, y + 197), (18 + 240, y + 243), color, -1)
+        textos.append((r["estado"], (32, y + 201), 28, blanco))
+        red = r.get("frescura")          # segunda opinión de la red neuronal (manzana, banano, naranja)
+        if red:
+            textos.append(("Red neuronal:", (276, y + 199), 15, gris))
+            textos.append((f"{red['veredicto']} {100 * red['confianza']:.0f} %", (276, y + 219), 20,
+                           (90, 90, 240) if red["veredicto"] == "Podrido" else (110, 210, 120)))
     y = 380
     escala = f"Escala: {px_por_cm:.1f} px/cm" + ("" if calibrado else "  (SIN CALIBRAR: K)")
     textos.append((escala, (18, y), 17, gris if calibrado else (60, 120, 255)))
@@ -269,7 +273,7 @@ def panel(H, r, suav, producto_fijo, seg, px_por_cm, calibrado, fondo_activo, au
 
 
 def suavizar(prev, r, alfa=0.3):
-    claves = ("area_cm2", "volumen_cm3", "peso_g", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct")
+    claves = ("area_cm2", "volumen_cm3", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct")
     nuevo = {}
     for k in claves:
         v = r[k]
@@ -291,12 +295,15 @@ def guardar_captura(frame, r):
         w = csv.writer(fh, delimiter=";")
         if nuevo:
             w.writerow(["fecha", "producto", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3",
-                        "peso_g", "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "automatico"])
+                        "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "automatico",
+                        "red_veredicto", "red_podrido_pct"])
         mad = "" if r["madurez_pct"] is None else f"{r['madurez_pct']:.1f}"
+        red = r.get("frescura") or {}
         w.writerow([marca, r["producto"], f"{r['largo_cm']:.2f}", f"{r['diametro_cm']:.2f}",
-                    f"{r['area_cm2']:.2f}", f"{r['volumen_cm3']:.1f}", f"{r['peso_g']:.0f}",
+                    f"{r['area_cm2']:.2f}", f"{r['volumen_cm3']:.1f}",
                     f"{r['area_dano_cm2']:.2f}", f"{r['dano_pct']:.1f}", mad, r["calibre"], r["estado"],
-                    "sí" if r["automatico"] else "no"])
+                    "sí" if r["automatico"] else "no",
+                    red.get("veredicto", ""), f"{100 * red['podrido']:.1f}" if red else ""])
     return ruta_rep
 
 

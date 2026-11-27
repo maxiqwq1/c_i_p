@@ -12,7 +12,6 @@ La cámara observa el producto (frutas y verduras) y el programa calcula:
 | Volumen de una hoja (espinaca) | Lámina delgada: área entre curvas × grosor | V = e · ∫ₐᵇ [f(x) − g(x)] dx |
 | Cálculo con píxeles | Suma de Riemann (Δx = 1 píxel) | A ≈ Σ [f(xᵢ) − g(xᵢ)] Δx |
 | Área dañada | Suma doble de Riemann (cada píxel = (1/k)² cm²) | A_daño ≈ Σ ΔA |
-| Peso estimado | Volumen × densidad | m = ρ V |
 
 Con eso clasifica el producto como **BUENO / REGULAR / INMADURO / DESCARTE** y asigna un calibre.
 
@@ -46,7 +45,7 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
 - **Probar sin cámara**: la pantalla inicial muestra las 14 fotos de la tabla de colores, cada una con su paleta; al tocar una se analiza. Su escala es **supuesta** (se eligió para que cada producto mida su tamaño típico, p. ej. una naranja de 7.8 cm), así que sus medidas son ilustrativas. Enlaces directos para compartir: `/?ejemplo=pera` (claves: `naranja`, `limon`, `manzana-roja`, `manzana-verde`, `mango`, `banano`, `papa`, `zanahoria`, `cebolla`, `pepino`, `pimiento`, `espinaca`, `pera`, `repollo`), `/?tabla` (la tabla completa) y `/?como` (las fórmulas).
 - Junto a los resultados se ven los **colores medidos** en la piel (los 4 principales, con su %) al lado de la **paleta de la tabla** del producto; la lámina también los muestra.
-- En el celular, el producto, su estado y el área, el volumen y el peso se muestran **sobre la cámara**, para no tener que bajar mientras se apunta; la barra inferior tiene Cámara, Foto, Capturar, Cambiar y Auto.
+- En el celular, el producto, su estado y el área y el volumen se muestran **sobre la cámara**, para no tener que bajar mientras se apunta; la barra inferior tiene Cámara, Foto, Capturar, Cambiar y Auto.
 
 ## Productos curvos: el eje curvo (banano)
 El método de discos clásico gira la silueta alrededor de un eje **recto**. Un banano es curvo, y con eje recto su volumen sale mal (los discos verticales cortan el banano en diagonal y lo "engordan"). Por eso, para productos alargados y curvos:
@@ -90,6 +89,32 @@ Prueba con productos sintéticos (16 tipos × 4 escenas de luz/fondo, calibrado 
 
 Productos nuevos de la tabla (sintéticos, 4 escenas): la pera, la hoja de espinaca y el pimiento rojo se reconocen siempre; el pimiento verde y el repollo, siempre que la cámara esté **calibrada** (su color y forma son como los de una lima o una manzana verde: lo que los separa es el tamaño); la cebolla dorada falla sobre madera, que es de su mismo color.
 
+## Segunda opinión: red neuronal fresco / podrido
+En **manzana, banano y naranja** se muestra, junto al estado, la *segunda opinión* de una red neuronal que mira la foto y dice si el producto se ve **fresco o podrido** (con su probabilidad). Es independiente del cálculo: el estado lo sigue decidiendo el área dañada. Si no coinciden (por ejemplo, el cálculo dice BUENO y la red dice *Podrido*), la página avisa para revisar el producto.
+
+- **Datos**: el dataset de Kaggle *Fruits fresh and rotten for classification* (`sriramr/fruits-fresh-and-rotten-for-classification`): 6 clases (manzana, banano y naranja, frescas y podridas).
+- **Red**: MobileNetV2 preentrenada con ImageNet, con la última capa cambiada a 6 salidas (transferencia de aprendizaje), entrenada 10 épocas. P(podrido) = suma de las probabilidades (softmax) de las 3 clases podridas.
+- **En la página**: el modelo (`modelo_frescura.onnx`, 9 MB) lo ejecuta OpenCV, sin PyTorch en el servidor, y tarda unos 5-15 ms por cuadro. Recibe un cuadrado alrededor del producto detectado.
+- **Una trampa del dataset**: de sus 13 599 imágenes solo 1 511 son fotos distintas; las demás son copias giradas, volteadas, desplazadas o con ruido, repartidas al azar entre `train` y `test` (1 310 fotos tienen copias en los dos lados). Medir con ese `test` es medir con fotos ya vistas. Aquí se separó **por foto original**: 70 % entrenamiento, 15 % validación y 15 % prueba, sin copias compartidas. (El notebook de Kaggle que usa este dataset, además, planteaba mal la salida —una sola salida sí/no para 6 clases— y acertaba el 14.5 %, menos que al azar).
+
+Resultados con las 227 fotos de prueba (nunca vistas al entrenar):
+
+| Prueba | Acierto fresco / podrido |
+|---|---|
+| Foto completa | 99.1 % (fruta y estado, 6 clases: 98.7 %) |
+| Por el camino de la página (detectar → recortar → red) | 98.0 % |
+| El producto pegado sobre gris, madera, mantel verde o fondo oscuro | 96-98 % |
+| Con baja resolución, ruido, luz cálida, fría u oscura, o todo junto (como una cámara web) | 98.7-99.6 % |
+
+Las 4 fotos reales de la tabla de colores (frescas) salen *Fresco*. Las frutas sintéticas con manchas dibujadas grandes salen *Podrido*.
+
+Para volver a entrenar (unos 4 minutos con una tarjeta NVIDIA RTX 2080 Ti):
+```
+pip install -r requirements-entrenamiento.txt
+python entrenar_frescura.py "C:\ruta\del\dataset\dataset"
+```
+La ruta es la carpeta que tiene `train` y `test`. Las fotos del dataset no se suben al repositorio (en Kaggle su licencia figura como desconocida): solo el modelo entrenado. `modelo_frescura.json` guarda los resultados de la prueba.
+
 ## Recomendaciones para la cámara real
 - Un fondo de color **distinto** al producto (mesa, mantel u hoja) y buena luz. Que el producto no toque el borde de la imagen.
 - Calibre la escala una vez: ponga **sola** una tarjeta de color (carnet o tarjeta de crédito, 8.56 cm) frente a la cámara, a la misma distancia que las frutas, y pulse **K**. Se guarda en `calibracion.json`. Si cambia la altura de la cámara, vuelva a calibrar.
@@ -103,14 +128,14 @@ Productos nuevos de la tabla (sintéticos, 4 escenas): la pera, la hoja de espin
 Cada captura guarda en `capturas/`: la foto, una **lámina con las gráficas de cálculo** (área entre curvas, discos, sólido 3D y convergencia de Riemann) y una fila en `resultados.csv` (se abre con Excel).
 
 ## Agregar otros productos
-Edite `productos.py` y agregue una ficha antes de *Genérico* (densidad, color de madurez, umbrales, calibre por diámetro o por largo, eje curvo si lo necesita, su paleta, y el perfil de reconocimiento: colores típicos, alargamiento, curvatura, saturación, brillo, palidez y diámetro). El cálculo de áreas y volúmenes es el mismo para cualquier producto. Si agrega su foto a `web/ejemplos/` y a `ejemplos.json`, corra `python entrenar_tabla.py` para que también sea un ejemplo de referencia.
+Edite `productos.py` y agregue una ficha antes de *Genérico* (color de madurez, umbrales, calibre por diámetro o por largo, eje curvo si lo necesita, su paleta, y el perfil de reconocimiento: colores típicos, alargamiento, curvatura, saturación, brillo, palidez y diámetro). El cálculo de áreas y volúmenes es el mismo para cualquier producto. Si agrega su foto a `web/ejemplos/` y a `ejemplos.json`, corra `python entrenar_tabla.py` para que también sea un ejemplo de referencia.
 
 ## Limitaciones (para mencionar en el informe)
-- El método de discos supone secciones **circulares** alrededor del eje (recto o curvo). Funciona bien con frutas redondas, banano, zanahoria, pepino, papa, cebolla y repollo. El **pimiento** es hueco: se usa una densidad *efectiva* (0.5 g/cm³ = peso real / volumen de la silueta). La **espinaca** se mide como una hoja (lámina de 0.5 mm): con una hoja extendida el área es exacta; de un manojo solo se mide la silueta, no el peso real. Brócoli y lechuga no están incluidos.
+- El método de discos supone secciones **circulares** alrededor del eje (recto o curvo). Funciona bien con frutas redondas, banano, zanahoria, pepino, papa, cebolla y repollo. El **pimiento** es hueco: el volumen medido es el de su silueta, no el de la pulpa. La **espinaca** se mide como una hoja (lámina de 0.5 mm): con una hoja extendida el área es exacta; de un manojo solo se mide la silueta. Brócoli y lechuga no están incluidos.
+- La **segunda opinión** solo existe para manzana, banano y naranja, y aparece cuando el producto se reconoce o se elige a mano. Una fruta muy podrida pierde su color, y el reconocimiento por color puede confundirla con otro producto: en ese caso, elija el producto a mano. Las fotos del dataset son de internet, casi todas de estudio: con la cámara real puede acertar menos.
 - La cámara ve una proyección 2D. La silueta está un poco más cerca de la cámara que la hoja, así que la escala tiene un pequeño error de perspectiva.
-- El reconocimiento usa reglas de color, forma y tamaño más ejemplos (los de la tabla y los que usted enseñe, por vecino más cercano), no una red neuronal. Los grupos más difíciles son **manzana roja / pimiento rojo** y, sin calibrar, **lima / manzana verde / repollo / pimiento verde**: calibre (el tamaño los separa), enseñe 2-3 ejemplos de cada uno o elija el producto a mano. Las fotos de la tabla son de estudio: con la cámara real decide sobre todo el perfil de cada producto. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
+- El reconocimiento usa reglas de color, forma y tamaño más ejemplos (los de la tabla y los que usted enseñe, por vecino más cercano), no una red neuronal (la red neuronal solo da la segunda opinión fresco / podrido). Los grupos más difíciles son **manzana roja / pimiento rojo** y, sin calibrar, **lima / manzana verde / repollo / pimiento verde**: calibre (el tamaño los separa), enseñe 2-3 ejemplos de cada uno o elija el producto a mano. Las fotos de la tabla son de estudio: con la cámara real decide sobre todo el perfil de cada producto. Las pruebas son con frutas sintéticas: con frutas reales los porcentajes pueden ser menores.
 - En pieles oscuras (pepino) o en hojas, las grietas y sombras naturales son casi negras: allí el umbral de daño baja con la luz y se ignoran las grietas finas, así que solo cuentan las manchas grandes y muy oscuras.
-- Densidades aproximadas: para mejorar el peso estimado hay que pesar algunas frutas reales y ajustar la densidad en `productos.py`.
 
 ## Archivos
 - `calculo.py`: las integrales (área, volumen y sumas de Riemann)
@@ -120,4 +145,6 @@ Edite `productos.py` y agregue una ficha antes de *Genérico* (densidad, color d
 - `demo_sintetica.py`: simulación de validación
 - `productos.py`: fichas de producto (con la paleta de la tabla de colores)
 - `entrenar_tabla.py` → `entrenamiento_tabla.json`: entrenamiento base con las fotos de la tabla
+- `frescura.py`: segunda opinión fresco / podrido (ejecuta `modelo_frescura.onnx` con OpenCV)
+- `entrenar_frescura.py` → `modelo_frescura.onnx` + `modelo_frescura.json`: entrenamiento de la red con el dataset de Kaggle (necesita `requirements-entrenamiento.txt`)
 - `web/ejemplos/`: la tabla de colores, 14 fotos recortadas de ella y `ejemplos.json`

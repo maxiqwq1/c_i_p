@@ -109,9 +109,12 @@ def numero(v, dec):
 
 
 def resumen(r):
+    red = r.get("frescura") or {}
     return {
+        "red_veredicto": red.get("veredicto"),                     # segunda opinión (red neuronal)
+        "red_podrido_pct": numero(100 * red["podrido"], 1) if red else None,
         "area_cm2": numero(r["area_cm2"], 2), "volumen_cm3": numero(r["volumen_cm3"], 1),
-        "peso_g": numero(r["peso_g"], 0), "largo_cm": numero(r["largo_cm"], 2),
+        "largo_cm": numero(r["largo_cm"], 2),
         "diametro_cm": numero(r["diametro_cm"], 2), "area_dano_cm2": numero(r["area_dano_cm2"], 2),
         "dano_pct": numero(r["dano_pct"], 1), "madurez_pct": numero(r["madurez_pct"], 1),
         "calibre": r["calibre"], "estado": r["estado"], "producto": r["producto"],
@@ -175,6 +178,7 @@ def api_analizar():
             "reconocido_id": r["reconocido_id"], "reconocimiento": r["reconocimiento"],
             "rasgos": r["rasgos"],                                  # la página los guarda al "Enseñar"
             "colores": r["colores"],                                # colores medidos (para compararlos con la tabla)
+            "frescura": r["frescura"],                              # segunda opinión fresco/podrido (o None)
         })
     return jsonify(salida)
 

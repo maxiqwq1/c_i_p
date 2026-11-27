@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 
 import calculo
+import frescura
 from productos import PRODUCTOS
 
 PESO_L = 0.35          # la luminosidad pesa poco: así las sombras no se confunden con el producto
@@ -637,16 +638,18 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50, calibrado=
     dano_pct = 100.0 * px_dano / px_producto
     mad = madurez(hsv, interior, dano, producto)
     estado, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"], med["largo_cm"])
+    # segunda opinión de la red neuronal (solo manzana, banano y naranja); no cambia el estado
+    segunda = frescura.evaluar(color, contorno, producto.nombre)
 
     med.update({
         "mascara": mascara, "contorno": contorno, "dano": dano,
         "Minv": Minv, "desplazamiento": desp, "angulo": angulo,
         "area_dano_cm2": px_dano / px_por_cm ** 2,     # suma doble de Riemann: cada píxel = (1/k)² cm²
         "dano_pct": dano_pct, "madurez_pct": mad,
-        "peso_g": med["volumen_cm3"] * producto.densidad,
         "estado": estado, "calibre": calibre, "producto": producto.nombre,
         "producto_id": PRODUCTOS.index(producto), "automatico": automatico,
         "reconocido_id": i_rec, "reconocimiento": info, "rasgos": rasgos,
         "colores": colores_dominantes(color, mascara),
+        "frescura": segunda,
     })
     return med

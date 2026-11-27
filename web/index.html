@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b100e">
-<meta name="description" content="Inspección de frutas y verduras con la cámara: área, volumen, peso, daño y madurez calculados con cálculo integral.">
+<meta name="description" content="Inspección de frutas y verduras con la cámara: área, volumen, daño y madurez calculados con cálculo integral.">
 <title>Inspección agrícola · Cálculo Integral</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234fd38a'/%3E%3Cpath d='M19.5 7.2c-2.3-1-4.3.2-4.8 2.7l-2.6 12.6c-.5 2.4-2.6 3.3-4.6 2.3' fill='none' stroke='%23062012' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
@@ -147,6 +147,13 @@
   .barra-colores i { display: block; height: 100%; }
   .colores-pie { display: grid; grid-template-columns: 1fr auto; gap: 14px; margin-top: 3px; color: var(--faint); font-size: .72rem; }
   .hud-paleta { flex: none; }
+  /* segunda opinión de la red neuronal: barra verde (fresco) que se llena de rojo (podrido) */
+  .red-fila { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-top: 6px; }
+  .red-fila b { font-size: 1.02rem; white-space: nowrap; }
+  .red-barra { display: block; height: 8px; border-radius: 4px; background: rgba(79, 211, 138, .55); overflow: hidden; }
+  .red-barra i { display: block; height: 100%; width: 0; background: var(--red); transition: width .3s; }
+  .red-nota { margin-top: 5px; color: var(--faint); font-size: .74rem; line-height: 1.35; }
+  .red-nota b { color: var(--amber); font-weight: 600; }
   .cand .paleta { margin-left: 6px; } .cand .paleta i { width: 7px; height: 7px; }
 
   /* controles bajo la cámara */
@@ -360,7 +367,7 @@
       <div id="hudRes" class="hud-res" hidden>
         <div class="hud-fila"><span id="hudProd" class="hud-prod">—</span><span id="hudPaleta" class="paleta hud-paleta"></span><span id="hudEstado" class="pill">—</span></div>
         <div class="hud-met">
-          <span>Área <b id="hudArea">—</b></span><span>Volumen <b id="hudVol">—</b></span><span>Peso <b id="hudPeso">—</b></span>
+          <span>Área <b id="hudArea">—</b></span><span>Volumen <b id="hudVol">—</b></span>
         </div>
       </div>
 
@@ -375,7 +382,7 @@
             <path d="M10 40h100" stroke="#5bd0f0" stroke-width="1.6" stroke-dasharray="4 4"/>
           </svg>
           <h2>Apunte la cámara a una fruta o verdura</h2>
-          <p>El programa la encuentra sola, la reconoce y calcula su área, volumen y peso con integrales.</p>
+          <p>El programa la encuentra sola, la reconoce y calcula su área y su volumen con integrales.</p>
           <ol class="pasos">
             <li><span class="n">1</span>Póngala sobre un fondo de otro color, con buena luz.</li>
             <li><span class="n">2</span>Déjela quieta un segundo: la lámina de cálculo se guarda sola.</li>
@@ -424,17 +431,22 @@
       <div class="metricas">
         <div class="metrica"><div class="m-et">Área <span class="m-f">∫(f−g)dx</span></div><div id="v_area" class="m-v">—</div></div>
         <div class="metrica"><div class="m-et">Volumen <span id="f_vol" class="m-f">π∫r²dx</span></div><div id="v_vol" class="m-v">—</div></div>
-        <div class="metrica"><div class="m-et">Peso estimado <span class="m-f">m = ρV</span></div><div id="v_peso" class="m-v">—</div></div>
-        <div class="metrica"><div class="m-et">Calibre</div><div id="v_cal" class="m-v">—</div></div>
         <div class="metrica ancha"><div class="m-et"><span id="t_dim">Largo × diámetro</span></div><div id="v_dim" class="m-v">—</div></div>
         <div class="metrica"><div class="m-et">Daño</div><div id="v_dano" class="m-v">—</div><div class="barrita"><i id="barDano" style="background:var(--red)"></i></div></div>
         <div class="metrica"><div class="m-et">Madurez</div><div id="v_mad" class="m-v">—</div><div class="barrita"><i id="barMad" style="background:var(--green)"></i></div></div>
+        <div class="metrica ancha"><div class="m-et">Calibre</div><div id="v_cal" class="m-v">—</div></div>
       </div>
 
       <div id="colores" class="colores" hidden>
         <div class="m-et">Colores de la piel <span class="m-f">medidos · tabla</span></div>
         <div class="colores-fila"><span id="colMedidos" class="barra-colores"></span><span id="colTabla" class="paleta grande"></span></div>
         <div class="colores-pie"><span id="colTexto"></span><span>paleta de la tabla</span></div>
+      </div>
+
+      <div id="red" class="colores" hidden>
+        <div class="m-et">Segunda opinión <span class="m-f">red neuronal</span></div>
+        <div class="red-fila"><b id="redVer">—</b><span class="red-barra" title="Probabilidad de podrido"><i id="redBar"></i></span></div>
+        <div id="redNota" class="red-nota"></div>
       </div>
 
       <label class="campo">Producto
@@ -451,7 +463,7 @@
       <h2><svg class="i"><use href="#i-lista"/></svg>Capturas <span id="nCapt" class="contador">0</span></h2>
       <button id="ultima" class="ultima" hidden><img id="ultimaImg" alt="Última lámina capturada"><div id="ultimaTxt"></div></button>
       <div class="historial"><table>
-        <thead><tr><th>Hora</th><th>Producto</th><th>cm²</th><th>cm³</th><th>g</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Hora</th><th>Producto</th><th>cm²</th><th>cm³</th><th>Estado</th></tr></thead>
         <tbody id="tabla"></tbody>
       </table></div>
       <div class="fila" style="margin-top:10px">
@@ -547,9 +559,10 @@
       <article><h3>3. Volumen por discos</h3><p class="f">V = π ∫ₐᵇ r(x)² dx,  r = (f − g) / 2</p><p>Al girar la silueta alrededor del eje se forma el sólido; cada rectángulo se vuelve un disco de volumen π r² Δx.</p></article>
       <article><h3>4. Productos curvos (banano)</h3><p class="f">L = ∫ √(1 + c′(x)²) dx,  V = π ∫ r⊥(s)² ds</p><p>El eje es la línea media c(x) = (f + g)/2; el largo es su longitud de arco y los discos van perpendiculares a la curva.</p></article>
       <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
-      <article><h3>6. Peso, daño y madurez</h3><p class="f">m = ρ V,  A_daño ≈ Σ ΔA</p><p>El peso usa la densidad de cada producto; el daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
+      <article><h3>6. Daño y madurez</h3><p class="f">A_daño ≈ Σ ΔA</p><p>El daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
       <article><h3>7. Hojas (espinaca)</h3><p class="f">V = e · A = e ∫ₐᵇ [f(x) − g(x)] dx</p><p>Una hoja no es un sólido de revolución sino una lámina delgada: su volumen es el área entre curvas por el grosor e (0.5 mm).</p></article>
       <article><h3>8. ¿Qué producto es?</h3><p>Cada fruta y verdura tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
+      <article><h3>9. Segunda opinión (red neuronal)</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle dice si se ve fresco o podrido. Es independiente del cálculo: si no coinciden, conviene revisar el producto. El estado lo sigue decidiendo el área dañada.</p></article>
     </div>
   </div>
 </dialog>
@@ -577,7 +590,7 @@ const MAX_ANCHO = 960;              // ancho de los cuadros enviados (la escala 
 const PX_DEFECTO = 12;
 const T_QUIETO = 1.2;               // segundos quieto para la captura automática
 const COLOR_ESTADO = { BUENO: "#2fb36b", REGULAR: "#e9a23b", INMADURO: "#4a90d9", DESCARTE: "#e0524d" };
-const CLAVES = ["area_cm2", "volumen_cm3", "peso_g", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct"];
+const CLAVES = ["area_cm2", "volumen_cm3", "largo_cm", "diametro_cm", "dano_pct", "madurez_pct"];
 const COLORES = { contorno: "#4fd38a", dano: "rgba(239,91,87,.55)", discos: "#f3c55b", eje: "#5bd0f0" };
 
 const st = {
@@ -747,7 +760,7 @@ function analizarUnaVez() {
 }
 
 // ---------------------------------------------------------------- reconocimiento y captura automática
-function reiniciarPresencia() { st.votos = {}; st.muestras = []; st.progreso = 0; st.capturada = null; st.suav = null; }
+function reiniciarPresencia() { st.votos = {}; st.muestras = []; st.progreso = 0; st.capturada = null; st.suav = null; st.redSuav = null; }
 
 function procesar(d) {
   const ahora = performance.now() / 1000;
@@ -818,8 +831,25 @@ function pintarEstado(estado) {
   }
 }
 
+/** Segunda opinión de la red neuronal (solo manzana, banano y naranja). No cambia el estado. */
+function pintarRed(f, r) {
+  $("red").hidden = !f;
+  if (!f) { st.redSuav = null; return; }
+  const p = st.redSuav = st.modo === "camara" && st.redSuav != null ? 0.3 * f.podrido + 0.7 * st.redSuav : f.podrido;
+  const podrido = p >= 0.5;
+  $("redVer").textContent = `${podrido ? "Podrido" : "Fresco"} · ${Math.round(100 * Math.max(p, 1 - p))} %`;
+  $("redVer").style.color = podrido ? "var(--red)" : "var(--green)";
+  $("redBar").style.width = Math.round(100 * p) + "%";
+  let alerta = "";
+  if (!f.coincide_fruta) alerta = `La red cree que es ${f.fruta_red}: su opinión es menos fiable. `;
+  else if (podrido ? ["BUENO", "INMADURO"].includes(r.estado) : r.estado === "DESCARTE")
+    alerta = `No coincide con el cálculo de daño (${fmt(r.dano_pct, 1)} %): revise el producto. `;
+  $("redNota").innerHTML = (alerta ? `<b>${alerta}</b>` : "") +
+    `Probabilidad de podrido: ${Math.round(100 * p)} %. Aprendida de fotos reales de manzana, banano y naranja (Kaggle); no cambia el estado.`;
+}
+
 function mostrar(d) {
-  const ids = ["v_area", "v_vol", "v_peso", "v_dim", "v_dano", "v_mad", "v_cal"];
+  const ids =["v_area", "v_vol", "v_dim", "v_dano", "v_mad", "v_cal"];
   if (!d.detectado) {
     $("prodNombre").textContent = "Sin producto";
     $("reconocido").textContent = st.modo === "foto" ? "No se encontró un producto en la foto" : "Buscando producto…";
@@ -828,6 +858,7 @@ function mostrar(d) {
     $("barDano").style.width = $("barMad").style.width = "0";
     $("porque").innerHTML = ""; $("porqueResumen").textContent = "¿Por qué este producto?";
     $("colores").hidden = true;
+    pintarRed(null);
     return;
   }
   const r = d.resultados, rec0 = d.reconocimiento || {};
@@ -839,6 +870,7 @@ function mostrar(d) {
     $("reconocido").textContent = id >= 0 ? (como[rec0.metodo] || "Reconocido automáticamente") : "Reconociendo…";
   } else $("reconocido").textContent = `Elegido a mano · el reconocimiento sugiere ${nombre(d.reconocido_id)}`;
   pintarEstado(r.estado);
+  pintarRed(d.frescura, r);
 
   const curvo = r.metodo_volumen === "curvo", lamina = r.metodo_volumen === "lamina";
   $("t_dim").textContent = curvo ? "Largo sobre el arco × grosor" : lamina ? "Largo × ancho de la hoja" : "Largo × diámetro";
@@ -853,7 +885,6 @@ function mostrar(d) {
   $("hudPaleta").innerHTML = puntos(paleta);
   $("v_area").textContent = fmt(s.area_cm2, 1) + " cm²";
   $("v_vol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
-  $("v_peso").textContent = fmt(s.peso_g, 0) + " g";
   $("v_dim").textContent = `${fmt(s.largo_cm, 1)} × ${fmt(s.diametro_cm, 1)} cm`;
   $("v_dano").textContent = fmt(s.dano_pct, 1) + " %";
   $("v_mad").textContent = s.madurez_pct == null ? "no aplica" : fmt(s.madurez_pct, 0) + " %";
@@ -865,7 +896,6 @@ function mostrar(d) {
   $("hudProd").textContent = r.producto;
   $("hudArea").textContent = fmt(s.area_cm2, 1) + " cm²";
   $("hudVol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
-  $("hudPeso").textContent = fmt(s.peso_g, 0) + " g";
   $("hudRes").hidden = false;
 
   // por qué: candidatos, método y rasgos medidos (para revisar las confusiones)
@@ -979,7 +1009,7 @@ async function capturar(automatica = false) {
     if (st.laminas.size > 30) { const [vieja] = st.laminas.keys(); URL.revokeObjectURL(st.laminas.get(vieja)); st.laminas.delete(vieja); }
     if (r) { st.historial.push({ fecha: marca, ...r }); guardarHistorial(); }
     $("ultima").hidden = false; $("ultimaImg").src = url; $("ultima").dataset.fecha = marca;
-    $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³ · ${fmt(r.peso_g, 0)} g<br>
+    $("ultimaTxt").innerHTML = r ? `<b>${r.producto}</b> · ${r.estado}<br>${fmt(r.area_cm2, 1)} cm² · ${fmt(r.volumen_cm3, 0)} cm³<br>
       <span style="color:var(--faint)">${automatica ? "Captura automática" : "Captura manual"} · toque para ver la lámina</span>` : "";
     if (automatica) {
       aviso(r ? `Lámina guardada: ${r.producto} · ${r.estado}` : "Lámina guardada", 2500);
@@ -1085,15 +1115,15 @@ function guardarHistorial() {
   $("nCapt").textContent = st.historial.length;
   $("tabla").innerHTML = st.historial.slice().reverse().map(h => `<tr class="${st.laminas.has(h.fecha) ? "ver" : ""}" data-fecha="${h.fecha}">
     <td>${h.fecha.slice(9, 11)}:${h.fecha.slice(11, 13)}</td><td>${h.producto}</td>
-    <td>${fmt(h.area_cm2, 1)}</td><td>${fmt(h.volumen_cm3, 0)}</td><td>${fmt(h.peso_g, 0)}</td>
+    <td>${fmt(h.area_cm2, 1)}</td><td>${fmt(h.volumen_cm3, 0)}</td>
     <td><span class="pill" style="background:${COLOR_ESTADO[h.estado] || ""}">${h.estado}</span></td></tr>`).join("")
-    || `<tr><td colspan="6" class="vacia">Las láminas aparecerán aquí al capturar.</td></tr>`;
+    || `<tr><td colspan="5" class="vacia">Las láminas aparecerán aquí al capturar.</td></tr>`;
 }
 
 function descargarCsv() {
   if (!st.historial.length) { aviso("No hay capturas."); return; }
-  const cols = ["fecha", "producto", "automatico", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3", "peso_g",
-                "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado"];
+  const cols = ["fecha", "producto", "automatico", "largo_cm", "diametro_cm", "area_cm2", "volumen_cm3",
+                "area_dano_cm2", "dano_pct", "madurez_pct", "calibre", "estado", "red_veredicto", "red_podrido_pct"];
   const filas = [cols.join(";"), ...st.historial.map(h => cols.map(k => h[k] ?? "").join(";"))];
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["﻿" + filas.join("\r\n")], { type: "text/csv" }));
