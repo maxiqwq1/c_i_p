@@ -271,11 +271,15 @@ def iluminacion(V, interior, iteraciones=3):
     return esperado
 
 
-def detectar_danos(frame, mascara, producto):
+def detectar_danos(frame, mascara, producto, p_podrido=None):
     """
-    Manchas = píxeles del interior mucho más oscuros que la luz que les LLEGA
-    (ver iluminacion). Así la sombra del lado no iluminado no se cuenta como daño,
-    pero una mancha oscura sí, esté donde esté.
+    Daño = píxeles del interior que son
+      1) manchas mucho más oscuras que la luz que les LLEGA (ver iluminacion): así la sombra
+         del lado no iluminado no se cuenta como daño, pero una mancha oscura sí, esté donde esté;
+      2) o, en manzana, banano y naranja, piel con COLOR DE PODRIDO (café claro, moho blanco o
+         verde...), aprendido de fotos reales (frescura.piel_podrida): esa podredumbre no es oscura.
+         p_podrido (lo que vio la red neuronal) decide qué tan dudoso puede ser ese color.
+    Devuelve (daño, interior, hsv, la parte del daño con color de podrido).
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     area = cv2.countNonZero(mascara)
@@ -283,17 +287,23 @@ def detectar_danos(frame, mascara, producto):
     k = max(3, int(0.08 * diam))                 # se ignora el borde (sombra natural)
     interior = cv2.erode(mascara, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
     if cv2.countNonZero(interior) < 50:
-        return np.zeros_like(mascara), interior, hsv
+        return np.zeros_like(mascara), interior, hsv, np.zeros_like(mascara)
     V = hsv[..., 2]
     esperado = iluminacion(V, interior > 0)
     # En pieles oscuras (pepino) las grietas y rayas naturales ya son muy oscuras:
     # allí el umbral baja con la luz que llega y solo cuenta lo casi negro.
     factor = producto.factor_oscuro * np.clip(esperado / 120.0, 0.5, 1.0)
-    dano = ((V < factor * esperado) & (interior > 0)).astype(np.uint8) * 255
+    dano = (V < factor * esperado) & (interior > 0)
+    podrido = frescura.piel_podrida(frame, producto.nombre, p_podrido)
+    if podrido is not None:
+        podrido &= interior > 0
+        dano |= podrido
+    dano = dano.astype(np.uint8) * 255
     # se quitan puntos y grietas finas (poros, rugosidad de la piel): una mancha real es un parche
     lado = max(3, int(round(0.015 * diam)) | 1)
     dano = cv2.morphologyEx(dano, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (lado, lado)))
-    return dano, interior, hsv
+    dano_color = dano & (podrido.astype(np.uint8) * 255) if podrido is not None else np.zeros_like(dano)
+    return dano, interior, hsv, dano_color
 
 
 # ---------------------------------------------------------------- reconocimiento
@@ -632,21 +642,25 @@ def analizar(frame, producto, px_por_cm, fondo=None, sensibilidad=50, calibrado=
                     "diametro_cm": med["grosor_cm"], "convergencia": med["convergencia_curvo"],
                     "metodo_volumen": "curvo"})
 
-    dano, interior, hsv = detectar_danos(color, mascara, producto)
+    # la red neuronal (manzana, banano y naranja): decide el estado junto con el daño (ver frescura.py)
+    # y, si ve la fruta podrida, el área dañada también cuenta los colores dudosos de podrido
+    red = frescura.evaluar(color, contorno, producto.nombre)
+    dano, interior, hsv, dano_color = detectar_danos(color, mascara, producto, red["podrido"] if red else None)
     px_producto = cv2.countNonZero(mascara)
     px_dano = cv2.countNonZero(dano)
     dano_pct = 100.0 * px_dano / px_producto
+    # qué parte del daño es piel con color de podrido (None si el producto no tiene ese modelo)
+    dano_color_pct = (100.0 * cv2.countNonZero(dano_color) / px_producto
+                      if frescura.piel_podrida_disponible(producto.nombre) else None)
     mad = madurez(hsv, interior, dano, producto)
     estado_calculo, calibre = clasificar(producto, dano_pct, mad, med["diametro_cm"], med["largo_cm"])
-    # la red neuronal (manzana, banano y naranja) decide junto con el daño medido (ver frescura.py)
-    red = frescura.evaluar(color, contorno, producto.nombre)
     estado, motivo = frescura.decidir(estado_calculo, red, dano_pct, producto.nombre)
 
     med.update({
         "mascara": mascara, "contorno": contorno, "dano": dano,
         "Minv": Minv, "desplazamiento": desp, "angulo": angulo,
         "area_dano_cm2": px_dano / px_por_cm ** 2,     # suma doble de Riemann: cada píxel = (1/k)² cm²
-        "dano_pct": dano_pct, "madurez_pct": mad,
+        "dano_pct": dano_pct, "dano_color_pct": dano_color_pct, "madurez_pct": mad,
         "estado": estado, "estado_calculo": estado_calculo, "motivo": motivo,
         "calibre": calibre, "producto": producto.nombre,
         "producto_id": PRODUCTOS.index(producto), "automatico": automatico,

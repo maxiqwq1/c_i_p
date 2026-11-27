@@ -20,6 +20,13 @@ estado se decide con las dos cosas (función decidir):
 - Entrada: un cuadrado alrededor del producto (con un margen), tal como lo ve la cámara;
   224 × 224 píxeles normalizados como ImageNet.
 - Salida: 6 probabilidades (softmax). P(podrido) = suma de las 3 clases podridas.
+
+COLORES DE PIEL PODRIDA (piel_podrida): para que el ÁREA dañada también incluya la podredumbre
+que no es oscura, se aprendió de las mismas fotos qué colores aparecen mucho más en la piel
+podrida que en la sana: r(color) = ln P(color|podrida)/P(color|fresca) (colores_dano.json, ver
+entrenar_colores_dano.py). Un píxel cuenta como podrido si r > umbral, y el umbral depende de lo
+que vio la red (teorema de Bayes): si la ve fresca, solo los colores claramente de podrido; si la
+ve podrida o duda, también los dudosos. vision.detectar_danos suma esos píxeles a las manchas oscuras.
 """
 import json
 import os
@@ -31,6 +38,7 @@ import numpy as np
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 RUTA_MODELO = os.path.join(RAIZ, "modelo_frescura.onnx")
 RUTA_INFO = os.path.join(RAIZ, "modelo_frescura.json")
+RUTA_COLORES = os.path.join(RAIZ, "colores_dano.json")
 
 # Umbrales de la decisión (elegidos con las fotos de VALIDACIÓN; medidos con las de PRUEBA, ver README)
 RED_PODRIDO = 0.5
@@ -43,6 +51,43 @@ NOMBRE_FRUTA = {"apples": "manzana", "banana": "banano", "oranges": "naranja"}
 _red = None          # None = sin cargar; False = no hay modelo
 _info = {}
 _candado = threading.Lock()
+_colores = None      # None = sin cargar; False = no hay modelo; si no, (casillas, {fruta: (r, umbral fresca, umbral podrida)})
+
+
+def _tablas_color():
+    global _colores
+    if _colores is None:
+        try:
+            with open(RUTA_COLORES, encoding="utf-8") as f:
+                d = json.load(f)
+            tablas = {fruta: (np.array(v["ln_razon_x10"], np.float32) / 10, v["umbral_fresca"], v["umbral_podrida"])
+                      for fruta, v in d["frutas"].items()}
+            _colores = (tuple(d["bins_lab"]), tablas)
+        except (OSError, ValueError, KeyError) as e:
+            print("Colores de piel podrida no disponibles (el daño son solo manchas oscuras):", e)
+            _colores = False
+    return _colores
+
+
+def piel_podrida_disponible(producto):
+    t = _tablas_color()
+    return bool(t) and FRUTA.get(producto) in t[1]
+
+
+def piel_podrida(color_bgr, producto, p_podrido=None):
+    """Píxeles cuyo color es de piel podrida para este producto (True/False por píxel),
+    o None si no hay modelo de colores para él. color_bgr: la imagen con la luz ya corregida.
+    p_podrido: lo que vio la red; si ve la fruta podrida o duda, cuentan también los colores dudosos."""
+    t = _tablas_color()
+    if not t or FRUTA.get(producto) not in t[1]:
+        return None
+    (nl, na, nb), tablas = t
+    r, umbral_fresca, umbral_podrida = tablas[FRUTA[producto]]
+    umbral = umbral_podrida if p_podrido is not None and p_podrido >= RED_DUDA else umbral_fresca
+    lab = cv2.cvtColor(color_bgr, cv2.COLOR_BGR2Lab)
+    i = ((lab[..., 0].astype(np.int32) * nl // 256) * na * nb + (lab[..., 1].astype(np.int32) * na // 256) * nb
+         + lab[..., 2].astype(np.int32) * nb // 256)
+    return r[i] > umbral
 
 
 def disponible():

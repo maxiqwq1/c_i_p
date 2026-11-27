@@ -29,11 +29,8 @@ import argparse
 import json
 import os
 import random
-import re
 import time
-from collections import defaultdict
 from datetime import date
-from multiprocessing import Pool
 
 import cv2
 import numpy as np
@@ -44,97 +41,14 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import models
 from torchvision.transforms import v2 as T
 
-CLASES = ["freshapples", "freshbanana", "freshoranges", "rottenapples", "rottenbanana", "rottenoranges"]
+from datos_frutas import (CLASES, SILUETA_DE_COPIA, calcular_siluetas, cuadrar, dividir, leer_silueta, listar,
+                          rgb, ruta_silueta)
+
 MEDIA = [0.485, 0.456, 0.406]          # normalización de ImageNet (la misma en frescura.py)
 DESV = [0.229, 0.224, 0.225]
 ENTRADA = 224
-COPIA = re.compile(r"^(rotated_by_-?\d+_|vertical_flip_|translation_|saltandpepper_)")
-# copias alineadas con la foto original: se puede usar su silueta (la "vertical_flip" es un espejo izq.-der.)
-SILUETA_DE_COPIA = {"": "igual", "saltandpepper_": "igual", "vertical_flip_": "espejo"}
 PROB_FONDO = 0.6                       # fracción de las fotos de entrenamiento con el fondo cambiado
 RAIZ = os.path.dirname(os.path.abspath(__file__))
-
-
-# ---------------------------------------------------------------- datos
-def listar(carpeta):
-    """{(clase, foto original): {archivo: ruta}} juntando train y test (la original y sus copias)."""
-    grupos = defaultdict(dict)
-    for parte in ("train", "test"):
-        for c in CLASES:
-            d = os.path.join(carpeta, parte, c)
-            for f in sorted(os.listdir(d)):
-                if f.lower().endswith((".png", ".jpg", ".jpeg")):
-                    grupos[(c, COPIA.sub("", f))].setdefault(f, os.path.join(d, f))   # sin duplicados
-    return grupos
-
-
-def dividir(grupos, semilla=7, fracciones=(0.70, 0.15)):
-    """División por foto original, estratificada por clase."""
-    partes = {"entrenamiento": [], "validacion": [], "prueba": []}
-    por_clase = defaultdict(list)
-    for (c, base) in sorted(grupos):
-        por_clase[c].append(base)
-    rnd = random.Random(semilla)
-    for c, bases in por_clase.items():
-        rnd.shuffle(bases)
-        n1 = round(len(bases) * fracciones[0])
-        n2 = n1 + round(len(bases) * fracciones[1])
-        for nombre, sel in (("entrenamiento", bases[:n1]), ("validacion", bases[n1:n2]), ("prueba", bases[n2:])):
-            partes[nombre] += [(c, b) for b in sel]
-    return partes
-
-
-def rgb(ruta):
-    """Imagen RGB (si trae transparencia, sobre blanco)."""
-    im = Image.open(ruta)
-    if im.mode in ("RGBA", "LA", "P"):
-        im = im.convert("RGBA")
-        im = Image.alpha_composite(Image.new("RGBA", im.size, (255, 255, 255, 255)), im)
-    return np.asarray(im.convert("RGB"))
-
-
-def cuadrar(a, relleno):
-    """Centra la imagen (o máscara) en un cuadrado, rellenando con `relleno` (como frescura.py)."""
-    h, w = a.shape[:2]
-    lado = max(h, w)
-    out = np.full((lado, lado) + a.shape[2:], relleno, a.dtype)
-    y0, x0 = (lado - h) // 2, (lado - w) // 2
-    out[y0:y0 + h, x0:x0 + w] = a
-    return out
-
-
-# ---------------------------------------------------------------- siluetas (detector de la página)
-def _silueta(args):
-    ruta, destino = args
-    import vision                                   # el mismo detector de la página
-    img = cv2.cvtColor(rgb(ruta), cv2.COLOR_RGB2BGR)
-    H, W = img.shape[:2]
-    a, b = H // 4, W // 4                           # margen: la fruta no debe tocar el borde
-    m, _ = vision.segmentar(cv2.copyMakeBorder(img, a, a, b, b, cv2.BORDER_REPLICATE), None, 50)
-    m = np.zeros((1, 1), np.uint8) if m is None else m[a:a + H, b:b + W]
-    if m.size > 1 and not 0.03 <= (m > 0).mean() <= 0.95:
-        m = np.zeros((1, 1), np.uint8)              # silueta dudosa: esa foto no cambia de fondo
-    os.makedirs(os.path.dirname(destino), exist_ok=True)
-    cv2.imencode(".png", m)[1].tofile(destino)
-
-
-def calcular_siluetas(grupos, pares, carpeta):
-    trabajos = []
-    for c, b in pares:
-        destino = os.path.join(carpeta, c, os.path.splitext(b)[0] + ".png")
-        if b in grupos[(c, b)] and not os.path.exists(destino):
-            trabajos.append((grupos[(c, b)][b], destino))
-    if trabajos:
-        print(f"Calculando {len(trabajos)} siluetas con el detector de la página…", flush=True)
-        with Pool(min(8, os.cpu_count() or 2)) as p:
-            p.map(_silueta, trabajos, chunksize=8)
-
-
-def leer_silueta(ruta):
-    if not ruta or not os.path.exists(ruta):
-        return None
-    m = cv2.imdecode(np.fromfile(ruta, np.uint8), cv2.IMREAD_GRAYSCALE)
-    return m if m is not None and m.size > 1 else None
 
 
 # ---------------------------------------------------------------- fondos al azar
@@ -280,7 +194,7 @@ def main():
     def items(parte, solo_originales):
         out = []
         for c, b in partes[parte]:
-            sil = os.path.join(carpeta_sil, c, os.path.splitext(b)[0] + ".png")
+            sil = ruta_silueta(carpeta_sil, c, b)
             for nombre, ruta in grupos[(c, b)].items():
                 if solo_originales and nombre != b:
                     continue

@@ -198,6 +198,7 @@
          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .barrita { height: 4px; border-radius: 2px; background: var(--line); margin-top: 7px; overflow: hidden; }
   .barrita i { display: block; height: 100%; width: 0; border-radius: 2px; transition: width .3s; }
+  .m-det { margin-top: 5px; color: var(--faint); font-size: .7rem; line-height: 1.3; }
 
   details.plegable { border-top: 1px solid var(--line); }
   details.plegable:first-of-type { border-top: 0; }
@@ -432,7 +433,7 @@
         <div class="metrica"><div class="m-et">Área <span class="m-f">∫(f−g)dx</span></div><div id="v_area" class="m-v">—</div></div>
         <div class="metrica"><div class="m-et">Volumen <span id="f_vol" class="m-f">π∫r²dx</span></div><div id="v_vol" class="m-v">—</div></div>
         <div class="metrica ancha"><div class="m-et"><span id="t_dim">Largo × diámetro</span></div><div id="v_dim" class="m-v">—</div></div>
-        <div class="metrica"><div class="m-et">Daño</div><div id="v_dano" class="m-v">—</div><div class="barrita"><i id="barDano" style="background:var(--red)"></i></div></div>
+        <div class="metrica"><div class="m-et">Daño</div><div id="v_dano" class="m-v">—</div><div class="barrita"><i id="barDano" style="background:var(--red)"></i></div><div id="v_dano_det" class="m-det"></div></div>
         <div class="metrica"><div class="m-et">Madurez</div><div id="v_mad" class="m-v">—</div><div class="barrita"><i id="barMad" style="background:var(--green)"></i></div></div>
         <div class="metrica ancha"><div class="m-et">Calibre</div><div id="v_cal" class="m-v">—</div></div>
       </div>
@@ -559,7 +560,7 @@
       <article><h3>3. Volumen por discos</h3><p class="f">V = π ∫ₐᵇ r(x)² dx,  r = (f − g) / 2</p><p>Al girar la silueta alrededor del eje se forma el sólido; cada rectángulo se vuelve un disco de volumen π r² Δx.</p></article>
       <article><h3>4. Productos curvos (banano)</h3><p class="f">L = ∫ √(1 + c′(x)²) dx,  V = π ∫ r⊥(s)² ds</p><p>El eje es la línea media c(x) = (f + g)/2; el largo es su longitud de arco y los discos van perpendiculares a la curva.</p></article>
       <article><h3>5. De píxeles a centímetros</h3><p class="f">cm = px/k,  cm² = px²/k²,  cm³ = px³/k³</p><p>k son los píxeles por centímetro, que se obtienen al calibrar con una tarjeta de 8.56 cm.</p></article>
-      <article><h3>6. Daño y madurez</h3><p class="f">A_daño ≈ Σ ΔA</p><p>El daño suma los píxeles mucho más oscuros que la luz local; la madurez mide el color de la piel.</p></article>
+      <article><h3>6. Daño y madurez</h3><p class="f">A_daño ≈ Σ ΔA</p><p>El daño suma los píxeles mucho más oscuros que la luz local y, en manzana, banano y naranja, los de color de piel podrida (café claro, moho), aprendido de fotos reales. La madurez mide el color de la piel.</p></article>
       <article><h3>7. ¿Qué producto es?</h3><p>Cada fruta tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de frutas de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
       <article><h3>8. Red neuronal + daño</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle calcula la probabilidad de que la fruta esté podrida: si es de 50 % o más, DESCARTE; entre 40 y 50 %, REGULAR; si la ve fresca, decide el daño medido. Así se detectan el moho y la piel arrugada, que no son manchas oscuras.</p></article>
     </div>
@@ -905,6 +906,7 @@ function mostrar(d) {
     $("reconocido").textContent = st.modo === "foto" ? "No se encontró un producto en la foto" : "Buscando producto…";
     pintarEstado(null); $("hudRes").hidden = true;
     ids.forEach(id => $(id).textContent = "—");
+    $("v_dano_det").textContent = "";
     $("barDano").style.width = $("barMad").style.width = "0";
     $("porque").innerHTML = ""; $("porqueResumen").textContent = "¿Por qué este producto?";
     $("colores").hidden = true;
@@ -939,6 +941,9 @@ function mostrar(d) {
   $("v_vol").textContent = fmt(s.volumen_cm3, 0) + " cm³";
   $("v_dim").textContent = `${fmt(s.largo_cm, 1)} × ${fmt(s.diametro_cm, 1)} cm`;
   $("v_dano").textContent = fmt(s.dano_pct, 1) + " %";
+  // qué parte es piel con color de podrido (manzana, banano y naranja) y qué parte manchas oscuras
+  $("v_dano_det").textContent = r.dano_color_pct == null ? "manchas oscuras" :
+    `color de podrido ${fmt(r.dano_color_pct, 1)} % · manchas oscuras ${fmt(Math.max(0, r.dano_pct - r.dano_color_pct), 1)} %`;
   $("v_mad").textContent = s.madurez_pct == null ? "no aplica" : fmt(s.madurez_pct, 0) + " %";
   $("v_cal").textContent = s.calibre;
   $("barDano").style.width = Math.min(100, (s.dano_pct || 0) * 4) + "%";
