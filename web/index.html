@@ -35,6 +35,7 @@
   /* ------------------------------------------------------------------ cabecera */
   .cab { display: flex; align-items: center; justify-content: space-between; gap: 12px;
          max-width: 1440px; margin: 0 auto; padding: 16px 20px 14px; }
+  .cab-botones { display: flex; align-items: center; gap: 6px; flex: none; }
   .marca { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; min-width: 0; }
   .logo { width: 40px; height: 40px; flex: none; border-radius: 12px; display: grid; place-items: center;
           background: linear-gradient(140deg, #6be0a0, #2fb36b); box-shadow: 0 6px 20px rgba(79, 211, 138, .25); }
@@ -254,6 +255,12 @@
   #dlg img { width: 100%; height: auto; display: block; border-radius: 10px; background: #fff; }
   #dlgComo { width: min(860px, 96vw); }
   #dlgTabla { width: min(1120px, 96vw); }
+  #dlgMision { width: min(760px, 96vw); }
+  .mision { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .mision article { background: var(--card-2); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 15px; }
+  .mision h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1rem; color: var(--green); }
+  .mision p { margin: 0; color: var(--text); font-size: .93rem; line-height: 1.55; }
+  .mision-nota { margin: 14px 2px 0; color: var(--faint); font-size: .8rem; line-height: 1.45; }
   .diagrama { width: 100%; max-width: 560px; display: block; margin: 0 auto 6px; }
   .d-relleno { fill: rgba(79, 211, 138, .10); }
   .d-cortes rect { fill: rgba(79, 211, 138, .10); stroke: rgba(79, 211, 138, .45); stroke-width: 1; }
@@ -291,7 +298,7 @@
   @media (max-width: 560px) {
     .cab { padding: 12px 12px 10px; }
     .marca small { display: none; }
-    #btnComo .txt { display: none; }
+    #btnComo .txt, #btnMision .txt { display: none; }
     .lienzo { border-radius: 16px; }
     .txt-pc { display: none; }
     /* barra inferior tipo app de cámara: 5 botones iguales con ícono y texto */
@@ -348,7 +355,10 @@
     </span>
     <span><strong>Inspección agrícola</strong><small>Áreas y volúmenes con cálculo integral</small></span>
   </a>
-  <button id="btnComo" class="btn fantasma"><svg class="i"><use href="#i-info"/></svg><span class="txt">¿Cómo funciona?</span></button>
+  <span class="cab-botones">
+    <button id="btnMision" class="btn fantasma" title="Misión y visión" aria-label="Misión y visión"><svg class="i"><use href="#i-objetivo"/></svg><span class="txt">Misión y visión</span></button>
+    <button id="btnComo" class="btn fantasma" title="¿Cómo funciona?" aria-label="¿Cómo funciona?"><svg class="i"><use href="#i-info"/></svg><span class="txt">¿Cómo funciona?</span></button>
+  </span>
 </header>
 
 <main class="app">
@@ -564,6 +574,20 @@
       <article><h3>7. ¿Qué producto es?</h3><p>Cada fruta tiene su combinación de colores. Se miden los colores de la piel, la forma y el tamaño y se comparan con las fotos de frutas de la <button class="enlace" data-ver-tabla>tabla de colores</button> y con el perfil de cada producto. Sus propios ejemplos (Enseñar) tienen prioridad.</p></article>
       <article><h3>8. Red neuronal + daño</h3><p class="f">P(podrido) = Σ softmax(z)ᵢ  (clases podridas)</p><p>En manzana, banano y naranja, una red neuronal (MobileNetV2) entrenada con fotos reales de Kaggle calcula la probabilidad de que la fruta esté podrida: si es de 50 % o más, DESCARTE; entre 40 y 50 %, REGULAR; si la ve fresca, decide el daño medido. Así se detectan el moho y la piel arrugada, que no son manchas oscuras.</p></article>
     </div>
+  </div>
+</dialog>
+
+<dialog id="dlgMision" aria-label="Misión y visión">
+  <div class="dlg-cab">
+    <h2>Misión y visión del simulador</h2>
+    <button class="ico" data-cerrar aria-label="Cerrar"><svg class="i"><use href="#i-cerrar"/></svg></button>
+  </div>
+  <div class="dlg-cuerpo">
+    <div class="mision">
+      <article><h3>Misión</h3><p>Aplicar el cálculo integral al análisis de frutas a partir de fotografías: construir modelos matemáticos de su contorno y, con integrales definidas, sumas de Riemann y el método de discos, estimar su tamaño, su volumen y el área de sus daños, para relacionar lo aprendido en clase con la selección y clasificación de productos agrícolas en Colombia.</p></article>
+      <article><h3>Visión</h3><p>Ser una herramienta educativa que muestre cómo el cálculo integral, el procesamiento digital de imágenes y la inteligencia artificial pueden apoyar la clasificación de frutas y ayudar a reducir las pérdidas que ocurren entre la cosecha y el consumo.</p></article>
+    </div>
+    <p class="mision-nota">Proyecto de Cálculo Integral con alcance educativo y matemático: no certifica la calidad de los alimentos ni reemplaza la inspección de las entidades encargadas.</p>
   </div>
 </dialog>
 
@@ -1232,6 +1256,7 @@ $("ultima").onclick = () => verLamina($("ultima").dataset.fecha);
 $("tabla").onclick = e => { const tr = e.target.closest("tr.ver"); if (tr) verLamina(tr.dataset.fecha); };
 $("btnEnsenar").onclick = ensenar;
 $("btnComo").onclick = () => $("dlgComo").showModal();
+$("btnMision").onclick = () => $("dlgMision").showModal();
 $("sens").oninput = e => { st.sens = +e.target.value; $("t_sens").textContent = e.target.value; marcarBotones(); analizarUnaVez(); };
 document.querySelectorAll("[data-cerrar]").forEach(b => b.onclick = () => b.closest("dialog").close());
 document.querySelectorAll("dialog").forEach(dl => dl.addEventListener("click", e => { if (e.target === dl) dl.close(); }));
@@ -1284,6 +1309,7 @@ document.addEventListener("keydown", e => {
   const p = new URLSearchParams(location.search);
   if (p.has("tabla")) verTabla();                                         // enlace directo a la tabla de colores
   else if (p.has("como")) $("dlgComo").showModal();                       // enlace directo a la explicación
+  else if (p.has("mision")) $("dlgMision").showModal();                   // enlace directo a la misión y visión
 })();
 </script>
 </body>

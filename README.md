@@ -1,6 +1,10 @@
 # Sistema automatizado de inspección de productos agrícolas
 Proyecto de **Cálculo Integral**: áreas y volúmenes aplicados a la visión por computador.
 
+**Misión.** Aplicar el cálculo integral al análisis de frutas a partir de fotografías: construir modelos matemáticos de su contorno y, con integrales definidas, sumas de Riemann y el método de discos, estimar su tamaño, su volumen y el área de sus daños, para relacionar lo aprendido en clase con la selección y clasificación de productos agrícolas en Colombia.
+
+**Visión.** Ser una herramienta educativa que muestre cómo el cálculo integral, el procesamiento digital de imágenes y la inteligencia artificial pueden apoyar la clasificación de frutas y ayudar a reducir las pérdidas que ocurren entre la cosecha y el consumo. (Alcance educativo y matemático: no certifica la calidad de los alimentos ni reemplaza la inspección de las entidades encargadas.)
+
 La cámara observa la fruta y el programa calcula:
 
 | Magnitud | Concepto de Cálculo Integral | Fórmula |
@@ -43,7 +47,7 @@ La página usa la cámara **del navegador** (en el celular, la trasera) o una fo
 - Railway: *New Project → Deploy from GitHub repo* → elegir este repositorio → *Settings → Networking → Generate Domain*. La configuración ya está en `railway.json` (usa `requirements.txt` con OpenCV sin pantalla).
 - La cámara del navegador solo funciona con HTTPS (Railway lo da) o en `localhost`.
 - La calibración y el historial de capturas se guardan en el navegador de cada dispositivo.
-- **Probar sin cámara**: la pantalla inicial muestra las 7 fotos de frutas de la tabla de colores, cada una con su paleta; al tocar una se analiza. Su escala es **supuesta** (se eligió para que cada producto mida su tamaño típico, p. ej. una naranja de 7.8 cm), así que sus medidas son ilustrativas. Enlaces directos para compartir: `/?ejemplo=pera` (claves: `naranja`, `limon`, `manzana-roja`, `manzana-verde`, `mango`, `banano`, `pera`), `/?tabla` (la tabla completa) y `/?como` (las fórmulas).
+- **Probar sin cámara**: la pantalla inicial muestra las 7 fotos de frutas de la tabla de colores, cada una con su paleta; al tocar una se analiza. Su escala es **supuesta** (se eligió para que cada producto mida su tamaño típico, p. ej. una naranja de 7.8 cm), así que sus medidas son ilustrativas. Enlaces directos para compartir: `/?ejemplo=pera` (claves: `naranja`, `limon`, `manzana-roja`, `manzana-verde`, `mango`, `banano`, `pera`), `/?tabla` (la tabla completa), `/?como` (las fórmulas) y `/?mision` (la misión y la visión).
 - Junto a los resultados se ven los **colores medidos** en la piel (los 4 principales, con su %) al lado de la **paleta de la tabla** del producto; la lámina también los muestra.
 - En el celular, el producto, su estado y el área y el volumen se muestran **sobre la cámara**, para no tener que bajar mientras se apunta; la barra inferior tiene Cámara, Foto, Capturar, Cambiar y Auto.
 
